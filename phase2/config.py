@@ -39,6 +39,45 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+_SQLITE_FILE_PREFIX = "sqlite:///"
+
+# Default location of the Phase 2 database, as an absolute project-root path.
+DEFAULT_DATABASE_URI = f"{_SQLITE_FILE_PREFIX}{(INSTANCE_DIR / 'phase2.db').as_posix()}"
+
+
+def sqlite_file_path(uri: str) -> Path | None:
+    """The file a SQLite URI points at, or ``None`` for in-memory / other backends."""
+    if not uri.startswith(_SQLITE_FILE_PREFIX):
+        return None                              # "sqlite://" (memory), postgres, ...
+    target = uri[len(_SQLITE_FILE_PREFIX):].split("?", 1)[0]
+    if not target or target.startswith((":", "file:")):
+        return None                              # ":memory:", SQLite URI filenames
+    return Path(target)
+
+
+def normalise_database_uri(uri: str, root: Path = BASE_DIR) -> str:
+    """Anchor a relative SQLite path to the project root.
+
+    Flask-SQLAlchemy resolves a relative SQLite path against ``instance_path``,
+    which would turn ``sqlite:///instance/phase2.db`` into ``instance/instance/
+    phase2.db``.  Anchoring to the project root here keeps the database where
+    the path says it is, whatever directory the ``flask`` command is run from.
+    """
+    path = sqlite_file_path(uri)
+    if path is None:
+        return uri
+    if path.is_absolute():
+        return uri
+    return f"{_SQLITE_FILE_PREFIX}{(root / path).resolve().as_posix()}"
+
+
+def ensure_database_directory(uri: str) -> None:
+    """Create the database file's parent directory before SQLAlchemy opens it."""
+    path = sqlite_file_path(uri)
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+
 class BaseConfig:
     """Settings shared by every environment."""
 
@@ -48,9 +87,10 @@ class BaseConfig:
     SECRET_KEY: str | None = os.environ.get("PHASE2_SECRET_KEY")
 
     # --- Database ----------------------------------------------------------
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "PHASE2_DATABASE_URI",
-        f"sqlite:///{INSTANCE_DIR / 'phase2.db'}",
+    # A relative SQLite path in PHASE2_DATABASE_URI is resolved against the
+    # project root, so the database lands in the same place from any cwd.
+    SQLALCHEMY_DATABASE_URI = normalise_database_uri(
+        os.environ.get("PHASE2_DATABASE_URI") or DEFAULT_DATABASE_URI
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

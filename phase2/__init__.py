@@ -14,7 +14,13 @@ from pathlib import Path
 
 from flask import Flask, g, redirect, render_template, request, url_for
 
-from .config import INSTANCE_DIR, generate_dev_secret, resolve_config
+from .config import (
+    INSTANCE_DIR,
+    ensure_database_directory,
+    generate_dev_secret,
+    normalise_database_uri,
+    resolve_config,
+)
 from .extensions import csrf, db
 
 __version__ = "2.0.0"
@@ -44,7 +50,11 @@ def create_app(config_name: str | None = None, **overrides) -> Flask:
     app.config.update(overrides)
 
     _resolve_secret_key(app)
+    app.config["SQLALCHEMY_DATABASE_URI"] = normalise_database_uri(
+        app.config["SQLALCHEMY_DATABASE_URI"]
+    )
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    ensure_database_directory(app.config["SQLALCHEMY_DATABASE_URI"])
 
     db.init_app(app)
     csrf.init_app(app)
