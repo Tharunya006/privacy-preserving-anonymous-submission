@@ -1,0 +1,10 @@
+{% extends "phase2/base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+
+{% block content %}
+<section class="panel panel-error">
+  <h1>{{ code }}</h1>
+  <p>{{ message }}</p>
+  <a class="btn" href="{{ url_for('main.home') }}">Return home</a>
+</section>
+{% endblock %}

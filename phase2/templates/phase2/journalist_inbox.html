@@ -1,0 +1,18 @@
+{% extends "phase2/base.html" %}
+{% block title %}Inbox{% endblock %}
+
+{% block content %}
+<h1>Submission inbox</h1>
+<section class="panel">
+  <p>
+    This route is protected by Phase 2 access control: only an
+    <strong>AUTHORIZED JOURNALIST</strong> can reach it.
+  </p>
+  <p class="muted">
+    Submission retrieval, evidence handling and decryption arrive in Phase 3 and
+    Phase 4. The access boundary around them is already in place and tested.
+  </p>
+  <span class="badge badge-pending">Awaiting Phase 3</span>
+</section>
+<p><a href="{{ url_for('journalist.dashboard') }}">&larr; Back to dashboard</a></p>
+{% endblock %}

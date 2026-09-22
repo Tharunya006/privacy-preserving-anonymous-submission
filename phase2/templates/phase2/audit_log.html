@@ -1,0 +1,27 @@
+{% extends "phase2/base.html" %}
+{% block title %}Audit log{% endblock %}
+
+{% block content %}
+<h1>Audit log</h1>
+<p class="muted">Most recent 100 security events. Passwords are never recorded.</p>
+
+<section class="panel">
+  {% if events %}
+  <table class="table">
+    <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td><code>{{ e.action }}</code></td>
+        <td>{{ e.actor_username or '-' }}</td>
+        <td>{{ e.target or '-' }}</td>
+        <td class="muted">{{ e.detail or '' }}</td>
+        <td class="muted">{{ e.ip_address or '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No events recorded yet.</p>{% endif %}
+</section>
+{% endblock %}

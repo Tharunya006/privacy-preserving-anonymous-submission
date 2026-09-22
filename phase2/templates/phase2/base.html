@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}Phase 2{% endblock %} &middot; Anonymous Submission System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='phase2/style.css') }}">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="{{ url_for('main.home') }}">
+      <span class="brand-mark">PPASS</span>
+      <span class="brand-sub">Privacy Preserving Anonymous Submission</span>
+    </a>
+
+    <nav class="nav">
+      {% set u = current_user() %}
+      {% if u %}
+        {% if u.is_admin %}
+          <a href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('admin.manage_journalists') }}">Journalists</a>
+          <a href="{{ url_for('admin.audit_log') }}">Audit</a>
+        {% else %}
+          <a href="{{ url_for('journalist.dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('journalist.inbox') }}">Inbox</a>
+        {% endif %}
+        <a href="{{ url_for('auth.change_password') }}">Password</a>
+        <span class="who">
+          {{ u.username }}
+          <span class="badge badge-role">{{ u.role }}</span>
+        </span>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+          {{ logout_form.hidden_tag() }}
+          <button type="submit" class="btn btn-small btn-ghost">Log out</button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="btn btn-small">Sign in</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+
+<main class="wrap main">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flashes" role="status">
+        {% for category, message in messages %}
+          <li class="flash flash-{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Phase 2 &mdash; Authentication &amp; Authorization &middot; v{{ phase2_version }}</p>
+    <p class="muted">Anonymous sources never create an account and are never asked to log in.</p>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='phase2/app.js') }}" defer></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{% extends "phase2/base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Privacy Preserving Anonymous Submission System</h1>
+  <p class="lead">
+    A secure channel between anonymous sources and authorized journalists.
+    Phase 2 provides the authentication and role-based access control layer.
+  </p>
+</section>
+
+<div class="card-grid">
+  <section class="card card-source">
+    <h2>I am a source</h2>
+    <p>
+      <strong>No account. No login. No email.</strong>
+      Anonymous sources are never registered in the user database and are never
+      asked to identify themselves.
+    </p>
+    <p class="muted">
+      The submission portal itself is delivered in Phase 3. Phase 2 only
+      guarantees that reaching this site requires no identity.
+    </p>
+    <span class="badge badge-pending">Submission portal &mdash; Phase 3</span>
+  </section>
+
+  <section class="card">
+    <h2>I am a journalist</h2>
+    <p>
+      Authorized receivers sign in to review submissions. Accounts are created by
+      an administrator and must be explicitly authorized before first use.
+    </p>
+    <a class="btn" href="{{ url_for('auth.login') }}">Sign in</a>
+  </section>
+
+  <section class="card">
+    <h2>I am an administrator</h2>
+    <p>
+      Administrators create journalist accounts, authorize or disable them, and
+      review the audit trail. There is no public administrator registration.
+    </p>
+    <a class="btn btn-ghost" href="{{ url_for('auth.login') }}">Admin sign in</a>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>What Phase 2 enforces</h2>
+  <ul class="tick-list">
+    <li>Passwords are stored only as salted PBKDF2-HMAC-SHA256 hashes.</li>
+    <li>Every protected route is checked on the server, not just hidden in the UI.</li>
+    <li>Journalists move through PENDING &rarr; AUTHORIZED &rarr; DISABLED under admin control.</li>
+    <li>Sessions are HttpOnly, SameSite, time-limited, and rebuilt at each sign-in.</li>
+    <li>Every state-changing form carries a CSRF token.</li>
+  </ul>
+</section>
+{% endblock %}

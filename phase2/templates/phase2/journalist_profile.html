@@ -1,0 +1,22 @@
+{% extends "phase2/base.html" %}
+{% block title %}My profile{% endblock %}
+
+{% block content %}
+<h1>My profile</h1>
+<section class="panel">
+  <dl class="detail-list">
+    <dt>Username</dt><dd>{{ user.username }}</dd>
+    <dt>Display name</dt><dd>{{ user.display_name or '-' }}</dd>
+    <dt>Email</dt><dd>{{ user.email or '-' }}</dd>
+    <dt>Role</dt><dd><span class="badge badge-role">{{ user.role }}</span></dd>
+    <dt>Status</dt><dd><span class="badge badge-{{ user.status|lower }}">{{ user.status }}</span></dd>
+    <dt>Account created</dt><dd>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+    <dt>Last sign-in</dt><dd>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'never' }}</dd>
+  </dl>
+  <p class="muted small">
+    Your password is stored only as a salted one-way hash. Nobody &mdash; including
+    an administrator &mdash; can read it back.
+  </p>
+</section>
+<p><a href="{{ url_for('journalist.dashboard') }}">&larr; Back to dashboard</a></p>
+{% endblock %}

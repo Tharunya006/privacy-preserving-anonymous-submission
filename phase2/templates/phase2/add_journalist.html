@@ -1,0 +1,57 @@
+{% extends "phase2/base.html" %}
+{% block title %}Add journalist{% endblock %}
+
+{% block content %}
+<h1>Add journalist</h1>
+<p class="muted">
+  Accounts start as <strong>PENDING</strong> unless you authorize them here.
+  The temporary password must be changed by the journalist at first sign-in.
+</p>
+
+<form method="post" class="panel form-panel" novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="field">
+    {{ form.username.label }}
+    {{ form.username(required=true, maxlength=64, autocomplete="off") }}
+    <p class="hint">3-64 characters: letters, digits, dot, dash or underscore.</p>
+    {% for error in form.username.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.display_name.label }}
+    {{ form.display_name(maxlength=120, autocomplete="off") }}
+    {% for error in form.display_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.email.label }}
+    {{ form.email(maxlength=200, autocomplete="off") }}
+    {% for error in form.email.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.password.label }}
+    {{ form.password(required=true, maxlength=128, autocomplete="new-password") }}
+    <p class="hint">
+      At least {{ config['PASSWORD_MIN_LENGTH'] }} characters with upper case, lower case,
+      a digit and a special character.
+    </p>
+    {% for error in form.password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.confirm_password.label }}
+    {{ form.confirm_password(required=true, maxlength=128, autocomplete="new-password") }}
+    {% for error in form.confirm_password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field field-check">
+    {{ form.authorize_now() }} {{ form.authorize_now.label }}
+    <p class="hint">Leave unchecked to review the account before granting access.</p>
+  </div>
+
+  {{ form.submit(class="btn") }}
+  <a class="btn btn-ghost" href="{{ url_for('admin.manage_journalists') }}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "phase2/base.html" %}
+{% block title %}{{ target.username }}{% endblock %}
+
+{% block content %}
+<h1>{{ target.username }}</h1>
+<p>
+  <span class="badge badge-role">{{ target.role }}</span>
+  <span class="badge badge-{{ target.status|lower }}">{{ target.status }}</span>
+  {% if target.must_change_password %}<span class="badge badge-temp">temp password</span>{% endif %}
+</p>
+
+<section class="panel">
+  <h2>Account</h2>
+  <dl class="detail-list">
+    <dt>ID</dt><dd>{{ target.id }}</dd>
+    <dt>Display name</dt><dd>{{ target.display_name or '-' }}</dd>
+    <dt>Email</dt><dd>{{ target.email or '-' }}</dd>
+    <dt>Created</dt><dd>{{ target.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+    <dt>Created by</dt><dd>{{ target.created_by.username if target.created_by else 'system' }}</dd>
+    <dt>Last login</dt><dd>{{ target.last_login_at.strftime('%Y-%m-%d %H:%M') if target.last_login_at else 'never' }}</dd>
+    <dt>Failed attempts</dt><dd>{{ target.failed_login_attempts }}</dd>
+    <dt>Locked until</dt><dd>{{ target.locked_until.strftime('%Y-%m-%d %H:%M') if target.locked_until else '-' }}</dd>
+  </dl>
+
+  <div class="action-row">
+    {% for s in ['AUTHORIZED', 'DISABLED', 'PENDING'] %}
+      {% if target.status != s %}
+      <form method="post" action="{{ url_for('admin.change_status', user_id=target.id) }}" class="inline-form">
+        {{ action_form.hidden_tag() }}
+        <input type="hidden" name="status" value="{{ s }}">
+        <input type="hidden" name="return_to" value="{{ url_for('admin.journalist_detail', user_id=target.id) }}">
+        <button class="btn btn-small {% if s == 'DISABLED' %}btn-danger{% endif %}" type="submit">
+          Set {{ s }}
+        </button>
+      </form>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel form-panel">
+  <h2>Reset password</h2>
+  <p class="muted">Sets a new temporary password. The journalist must change it at next sign-in.</p>
+  <form method="post" action="{{ url_for('admin.reset_journalist_password', user_id=target.id) }}" novalidate>
+    {{ reset_form.hidden_tag() }}
+    <div class="field">
+      {{ reset_form.new_password.label }}
+      {{ reset_form.new_password(required=true, autocomplete="new-password") }}
+      {% for error in reset_form.new_password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="field">
+      {{ reset_form.confirm_password.label }}
+      {{ reset_form.confirm_password(required=true, autocomplete="new-password") }}
+      {% for error in reset_form.confirm_password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+    {{ reset_form.submit(class="btn") }}
+  </form>
+</section>
+
+<section class="panel">
+  <h2>History</h2>
+  {% if events %}
+  <table class="table">
+    <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td><code>{{ e.action }}</code></td>
+        <td>{{ e.actor_username or '-' }}</td>
+        <td class="muted">{{ e.detail or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Nothing recorded yet.</p>{% endif %}
+</section>
+
+<p><a href="{{ url_for('admin.manage_journalists') }}">&larr; Back to all journalists</a></p>
+{% endblock %}

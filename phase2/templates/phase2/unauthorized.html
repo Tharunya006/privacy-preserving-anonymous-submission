@@ -1,0 +1,25 @@
+{% extends "phase2/base.html" %}
+{% block title %}Access denied{% endblock %}
+
+{% block content %}
+<section class="panel panel-error">
+  <h1>403 &mdash; Access denied</h1>
+  {% set u = current_user() %}
+  {% if u %}
+    <p>
+      You are signed in as <strong>{{ u.username }}</strong>
+      (<span class="badge badge-role">{{ u.role }}</span>), but this page requires
+      a different role or authorization level.
+    </p>
+    <p class="muted">
+      This check runs on the server. Hiding or revealing links in the interface
+      does not change what you are allowed to open.
+    </p>
+    <a class="btn" href="{{ url_for('main.dashboard_redirect') }}">Go to my dashboard</a>
+  {% else %}
+    <p>You do not have permission to view this page.</p>
+    <a class="btn" href="{{ url_for('auth.login') }}">Sign in</a>
+  {% endif %}
+  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Home</a>
+</section>
+{% endblock %}

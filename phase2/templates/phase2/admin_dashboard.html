@@ -1,0 +1,70 @@
+{% extends "phase2/base.html" %}
+{% block title %}Admin dashboard{% endblock %}
+
+{% block content %}
+<h1>Admin dashboard</h1>
+<p class="muted">Signed in as <strong>{{ user.username }}</strong> (ADMIN).</p>
+
+<div class="stat-row">
+  <div class="stat"><span class="stat-num">{{ counts['TOTAL'] }}</span><span class="stat-label">Journalists</span></div>
+  <div class="stat"><span class="stat-num">{{ counts['PENDING'] }}</span><span class="stat-label">Pending</span></div>
+  <div class="stat"><span class="stat-num">{{ counts['AUTHORIZED'] }}</span><span class="stat-label">Authorized</span></div>
+  <div class="stat"><span class="stat-num">{{ counts['DISABLED'] }}</span><span class="stat-label">Disabled</span></div>
+</div>
+
+<div class="action-row">
+  <a class="btn" href="{{ url_for('admin.add_journalist') }}">Add journalist</a>
+  <a class="btn btn-ghost" href="{{ url_for('admin.manage_journalists') }}">Manage journalists</a>
+  <a class="btn btn-ghost" href="{{ url_for('admin.audit_log') }}">Full audit log</a>
+</div>
+
+<section class="panel">
+  <h2>Awaiting authorization</h2>
+  {% if pending %}
+    <table class="table">
+      <thead><tr><th>Username</th><th>Name</th><th>Created</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for j in pending %}
+        <tr>
+          <td><a href="{{ url_for('admin.journalist_detail', user_id=j.id) }}">{{ j.username }}</a></td>
+          <td>{{ j.display_name or '-' }}</td>
+          <td>{{ j.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
+              {{ action_form.hidden_tag() }}
+              <input type="hidden" name="status" value="AUTHORIZED">
+              <input type="hidden" name="return_to" value="{{ url_for('admin.dashboard') }}">
+              <button class="btn btn-small" type="submit">Authorize</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No accounts are waiting for authorization.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Recent activity</h2>
+  {% if recent_events %}
+    <table class="table">
+      <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th></tr></thead>
+      <tbody>
+      {% for e in recent_events %}
+        <tr>
+          <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td><code>{{ e.action }}</code></td>
+          <td>{{ e.actor_username or '-' }}</td>
+          <td>{{ e.target or '-' }}</td>
+          <td class="muted">{{ e.detail or '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No activity recorded yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

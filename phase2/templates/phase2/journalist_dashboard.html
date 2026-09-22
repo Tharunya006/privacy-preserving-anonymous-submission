@@ -1,0 +1,43 @@
+{% extends "phase2/base.html" %}
+{% block title %}Journalist dashboard{% endblock %}
+
+{% block content %}
+<h1>Journalist dashboard</h1>
+<p class="muted">
+  Signed in as <strong>{{ user.display_name or user.username }}</strong>
+  <span class="badge badge-role">{{ user.role }}</span>
+  <span class="badge badge-authorized">{{ user.status }}</span>
+</p>
+
+<div class="card-grid">
+  <section class="card">
+    <h2>Submission inbox</h2>
+    <p>Anonymous submissions routed to you will appear here.</p>
+    <a class="btn btn-ghost" href="{{ url_for('journalist.inbox') }}">Open inbox</a>
+  </section>
+
+  <section class="card">
+    <h2>My account</h2>
+    <p>Review your account details and authorization state.</p>
+    <a class="btn btn-ghost" href="{{ url_for('journalist.profile') }}">View profile</a>
+  </section>
+
+  <section class="card">
+    <h2>Security</h2>
+    <p>Change your password. If an administrator issued you a temporary one, you must change it.</p>
+    <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change password</a>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Access status</h2>
+  <p>
+    Your account is <strong>{{ user.status }}</strong>. Access is re-checked on
+    every request &mdash; if an administrator disables this account, you lose
+    access immediately, without waiting for the session to expire.
+  </p>
+  <p class="muted small">Last sign-in:
+    {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'this is your first' }}.
+  </p>
+</section>
+{% endblock %}
