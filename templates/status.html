@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Submission Status</title>
+</head>
+
+<body>
+
+    <h1>Check Submission Status</h1>
+
+    <p>
+        Enter your submission token to check the status of your report.
+    </p>
+
+    <form method="POST" action="/status">
+
+        <label for="token">Submission Token:</label><br>
+
+        <input
+            type="text"
+            id="token"
+            name="token"
+            placeholder="Enter your submission token"
+            required
+        >
+
+        <br><br>
+
+        <button type="submit">Check Status</button>
+
+    </form>
+
+    <br>
+
+    <a href="/">Back to Home</a>
+
+</body>
+
+</html>
