@@ -1,8 +1,0 @@
-# Phase 2 (Authentication & Authorization) dependencies.
-# Kept separate from Phase 1's requirements.txt so the two phases can be
-# developed in parallel. At merge time these lines fold into one file.
-Flask>=3.0,<4.0
-Flask-SQLAlchemy>=3.1,<4.0
-Flask-WTF>=1.2,<2.0
-python-dotenv>=1.0,<2.0
-pytest>=8.0

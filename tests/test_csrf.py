@@ -134,3 +134,27 @@ class TestCsrfEnforcement:
         )
         assert response.status_code == 400
         assert User.get_by_username("forged") is None
+
+
+class TestCsrfOnAnonymousForms:
+    """The source portal is public but still CSRF-protected (no account needed)."""
+
+    def test_submit_form_includes_a_token(self, csrf_client):
+        assert b'name="csrf_token"' in csrf_client.get("/submit").data
+
+    def test_submission_without_token_is_refused(self, csrf_client, csrf_app):
+        from submissions.models import Submission
+
+        response = csrf_client.post("/submit", data={"title": "t", "content": "c"})
+        assert response.status_code == 400
+        assert db.session.query(Submission).count() == 0
+
+    def test_submission_with_token_succeeds(self, csrf_client, csrf_app):
+        from submissions.models import Submission
+
+        token = extract_token(csrf_client.get("/submit").data)
+        response = csrf_client.post(
+            "/submit", data={"csrf_token": token, "title": "t", "content": "c"}
+        )
+        assert response.status_code == 200
+        assert db.session.query(Submission).count() == 1

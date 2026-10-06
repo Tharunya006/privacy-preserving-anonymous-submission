@@ -187,8 +187,17 @@ class TestLockoutCounters:
 
 class TestSchema:
     def test_tables_are_namespaced_for_phase2(self, app):
-        """Table names must not collide with anything Phase 1 creates."""
+        """Phase 2's tables keep their prefix, so they never collide with Phase 1's.
+
+        Since the integration both phases share one metadata, so the check is on
+        the tables Phase 2 owns rather than on every table in the database.
+        """
+        from phase2.models import AuditLog
+
+        assert User.__tablename__ == "phase2_users"
+        assert AuditLog.__tablename__ == "phase2_audit_log"
         names = set(db.metadata.tables)
-        assert "phase2_users" in names
-        assert "phase2_audit_log" in names
-        assert all(name.startswith("phase2_") for name in names)
+        phase1_tables = {"submissions", "submission_evidence"}
+        assert {"phase2_users", "phase2_audit_log"} <= names
+        assert phase1_tables <= names
+        assert all(name.startswith("phase2_") for name in names - phase1_tables)

@@ -110,3 +110,96 @@ class TestNoHardCodedSecrets:
                 if pattern.search(line) and "testing-only" not in line:
                     offenders.append(f"{path.name}:{lineno}")
         assert not offenders, f"hard-coded SECRET_KEY found at {offenders}"
+
+
+class TestResetPasswordCommand:
+    NEW_PASSWORD = "BrandNew!Pass42"
+
+    def _reset(self, app, username, *passwords):
+        runner = app.test_cli_runner()
+        return runner.invoke(
+            args=["reset-password", "--username", username],
+            input="".join(f"{p}\n" for p in passwords),
+        )
+
+    def test_admin_password_is_reset(self, app, admin, client):
+        from phase2.models import AuditLog
+        from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, login
+
+        result = self._reset(app, ADMIN_USERNAME, self.NEW_PASSWORD, self.NEW_PASSWORD)
+        assert result.exit_code == 0, result.output
+        assert "has been reset" in result.output
+
+        user = User.get_by_username(ADMIN_USERNAME)
+        assert user.check_password(self.NEW_PASSWORD)
+        assert not user.check_password(ADMIN_PASSWORD)
+        assert user.password_hash.startswith("pbkdf2:sha256:")
+        assert user.must_change_password is False
+
+        entry = AuditLog.query.filter_by(action="password.reset").one()
+        assert entry.target == ADMIN_USERNAME
+        assert entry.detail == "via CLI"
+
+        # The new password works through the real login flow; the old one does not.
+        assert b"Invalid username or password" in login(client, ADMIN_USERNAME, ADMIN_PASSWORD).data
+        assert b"Admin dashboard" in login(client, ADMIN_USERNAME, self.NEW_PASSWORD).data
+
+    def test_password_is_never_echoed(self, app, admin):
+        result = self._reset(app, "rootadmin", self.NEW_PASSWORD, self.NEW_PASSWORD)
+        assert self.NEW_PASSWORD not in result.output
+        assert "pbkdf2" not in result.output
+
+    def test_weak_password_is_refused_and_prompted_again(self, app, admin):
+        from tests.conftest import ADMIN_PASSWORD
+
+        result = self._reset(app, "rootadmin", "short")
+        assert result.exit_code != 0
+        assert "at least 10 characters" in result.output
+        assert User.get_by_username("rootadmin").check_password(ADMIN_PASSWORD)
+
+        result = self._reset(
+            app, "rootadmin", "alllowercase123!", self.NEW_PASSWORD, self.NEW_PASSWORD
+        )
+        assert result.exit_code == 0, result.output
+        assert "one uppercase letter" in result.output
+        assert User.get_by_username("rootadmin").check_password(self.NEW_PASSWORD)
+
+    def test_mismatched_confirmation_changes_nothing(self, app, admin):
+        from tests.conftest import ADMIN_PASSWORD
+
+        result = self._reset(app, "rootadmin", self.NEW_PASSWORD, "Different!Pass42")
+        assert result.exit_code != 0
+        assert User.get_by_username("rootadmin").check_password(ADMIN_PASSWORD)
+
+    def test_unknown_user_fails(self, app):
+        result = self._reset(app, "ghost", self.NEW_PASSWORD, self.NEW_PASSWORD)
+        assert result.exit_code != 0
+        assert "No such user" in result.output
+
+    def test_journalist_reset_is_temporary_and_clears_lockout(self, app, journalist):
+        from datetime import timedelta
+
+        from phase2.extensions import db
+        from phase2.models import utcnow
+
+        journalist.locked_until = utcnow() + timedelta(minutes=10)
+        journalist.failed_login_attempts = 3
+        db.session.commit()
+
+        result = self._reset(app, journalist.username, self.NEW_PASSWORD, self.NEW_PASSWORD)
+        assert result.exit_code == 0, result.output
+        assert "must change it" in result.output
+
+        user = User.get_by_username(journalist.username)
+        assert user.check_password(self.NEW_PASSWORD)
+        assert user.must_change_password is True
+        assert user.locked_until is None
+        assert user.failed_login_attempts == 0
+
+    def test_web_guard_on_admin_accounts_is_unchanged(self, app, admin):
+        import pytest
+
+        from phase2.services import reset_password
+
+        with pytest.raises(ValueError, match="cannot be reset"):
+            reset_password(admin, self.NEW_PASSWORD)

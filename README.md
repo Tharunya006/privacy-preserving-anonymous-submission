@@ -3,28 +3,33 @@ Privacy Preserving Anonymous Submission System - Project
 
 ---
 
-## Phase 2 — Authentication & Authorization
+One Flask application with one database:
 
-Phase 2 adds the identity and access-control layer: admin and journalist
-authentication, role-based access control, secure sessions, and the admin
-dashboard for managing journalist accounts. Anonymous sources deliberately
-require no account and no login.
+* **Anonymous sources** submit reports (with optional evidence) and check their
+  status using a random token — no account, no login, no IP stored.
+* **Authorized journalists** sign in to read reports, download evidence and
+  update each report's status.
+* **Administrators** create, authorize and disable journalist accounts and
+  review the audit log.
 
-Phase 2 runs independently of Phase 1 and does not modify any Phase 1 file.
+Phase 1 (the submission portal), Phase 2 (authentication, RBAC, secure
+sessions, CSRF, lockout, audit logging) and Phase 4 (journalist inbox, report
+view, `Submitted → Under review → Closed` workflow, evidence download) are
+integrated; see [`docs/integration_notes.md`](docs/integration_notes.md).
 
 ### Quick start
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
-pip install -r requirements-phase2.txt
+pip install -r requirements.txt
 
 cp .env.example .env
 python -c "import secrets; print(secrets.token_urlsafe(48))"   # paste into PHASE2_SECRET_KEY
 
-flask --app phase2_app init-db
-flask --app phase2_app create-admin --username admin
-python phase2_app.py                   # http://127.0.0.1:5001
+flask --app app init-db
+flask --app app create-admin --username admin
+python app.py                          # http://127.0.0.1:5001
 ```
 
 ### Tests
@@ -35,7 +40,9 @@ pytest
 
 ### Documentation
 
-* [`docs/phase2.md`](docs/phase2.md) — architecture, authentication, RBAC,
-  database schema, routes, security measures
-* [`docs/integration_notes.md`](docs/integration_notes.md) — how Phase 2 merges
-  into Phase 1, and which files belong to which phase
+* [`docs/integration_notes.md`](docs/integration_notes.md) — final architecture,
+  database, routes, and how to run the integrated application
+* [`docs/phase2.md`](docs/phase2.md) — authentication, RBAC and security
+  measures in depth
+* [`docs/phase4.md`](docs/phase4.md) — journalist workflow, status rules,
+  evidence access and Phase 4 security

@@ -1,37 +1,25 @@
-import sqlite3
+"""Create every table of the unified database.
 
-DATABASE = "database/app.db"
+Kept so Phase 1's ``python database/init_db.py`` still works.  It is equivalent
+to ``flask --app app init-db``: both create the account, audit and submission
+tables in the one SQLAlchemy database (default ``instance/phase2.db``).
+Existing tables and rows are left untouched.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from phase2 import create_app  # noqa: E402
+from phase2.extensions import db  # noqa: E402
 
 
 def create_database():
-    connection = sqlite3.connect(DATABASE)
-
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            submission_token TEXT NOT NULL UNIQUE,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Submitted',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    connection.commit()
-    connection.close()
-
-    print("Database and tables created successfully!")
+    app = create_app()
+    with app.app_context():
+        db.create_all()
+        print(f"Database ready: {app.config['SQLALCHEMY_DATABASE_URI']}")
 
 
 if __name__ == "__main__":

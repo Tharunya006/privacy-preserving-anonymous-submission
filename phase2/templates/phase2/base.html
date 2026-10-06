@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>{% block title %}Phase 2{% endblock %} &middot; Anonymous Submission System</title>
+  <title>{% block title %}Home{% endblock %} &middot; Anonymous Submission System</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='phase2/style.css') }}">
 </head>
 <body>
@@ -36,6 +36,8 @@
           <button type="submit" class="btn btn-small btn-ghost">Log out</button>
         </form>
       {% else %}
+        <a href="{{ url_for('source.submit') }}">Submit a report</a>
+        <a href="{{ url_for('source.status') }}">Check status</a>
         <a href="{{ url_for('auth.login') }}" class="btn btn-small">Sign in</a>
       {% endif %}
     </nav>
@@ -58,7 +60,7 @@
 
 <footer class="site-footer">
   <div class="wrap">
-    <p>Phase 2 &mdash; Authentication &amp; Authorization &middot; v{{ phase2_version }}</p>
+    <p>Privacy Preserving Anonymous Submission System &middot; v{{ phase2_version }}</p>
     <p class="muted">Anonymous sources never create an account and are never asked to log in.</p>
   </div>
 </footer>

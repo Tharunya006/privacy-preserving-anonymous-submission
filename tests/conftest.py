@@ -1,7 +1,8 @@
-"""Shared pytest fixtures for the Phase 2 test suite.
+"""Shared pytest fixtures for the test suite.
 
-Every test runs against a throw-away in-memory SQLite database, so the suite
-never touches instance/phase2.db and leaves nothing behind.
+Every test runs against a throw-away in-memory SQLite database and a temporary
+evidence directory, so the suite never touches instance/ and leaves nothing
+behind.
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ JOURNALIST_PASSWORD = "Reporter!2345"
 
 
 @pytest.fixture()
-def app():
-    application = create_app("testing")
+def app(tmp_path):
+    application = create_app("testing", EVIDENCE_DIR=str(tmp_path / "evidence"))
     with application.app_context():
         _db.create_all()
         yield application

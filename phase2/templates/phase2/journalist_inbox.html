@@ -3,16 +3,53 @@
 
 {% block content %}
 <h1>Submission inbox</h1>
+<p class="muted">
+  Anonymous reports, newest first. Opening a report or downloading evidence is
+  recorded in the audit log.
+</p>
+
+<div class="action-row">
+  <a class="btn btn-ghost {% if not status_filter %}is-active{% endif %}"
+     href="{{ url_for('journalist.inbox') }}">All ({{ counts['TOTAL'] }})</a>
+  {% for s in statuses %}
+    <a class="btn btn-ghost {% if status_filter == s.value %}is-active{% endif %}"
+       href="{{ url_for('journalist.inbox', status=s.value) }}">{{ s.label }} ({{ counts[s.value] }})</a>
+  {% endfor %}
+</div>
+
 <section class="panel">
-  <p>
-    This route is protected by Phase 2 access control: only an
-    <strong>AUTHORIZED JOURNALIST</strong> can reach it.
-  </p>
-  <p class="muted">
-    Submission retrieval, evidence handling and decryption arrive in Phase 3 and
-    Phase 4. The access boundary around them is already in place and tested.
-  </p>
-  <span class="badge badge-pending">Awaiting Phase 3</span>
+  {% if submissions %}
+  <table class="table">
+    <thead>
+      <tr><th>Ref.</th><th>Title</th><th>Status</th><th>Evidence</th><th>Received (UTC)</th><th>Updated (UTC)</th></tr>
+    </thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td class="nowrap">#{{ s.id }}</td>
+        <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{{ s.title }}</a></td>
+        <td><span class="badge badge-sub-{{ s.status|lower }}">{{ s.status_label }}</span></td>
+        <td>{{ s.evidence|length }}</td>
+        <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="nowrap">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if pagination.pages > 1 %}
+  <nav class="pager" aria-label="Inbox pages">
+    {% if pagination.has_prev %}
+      <a class="btn btn-small btn-ghost" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.prev_num) }}">&larr; Newer</a>
+    {% endif %}
+    <span class="muted small">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+      <a class="btn btn-small btn-ghost" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.next_num) }}">Older &rarr;</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+    <p class="muted">No submissions{% if status_filter %} with this status{% endif %} yet.</p>
+  {% endif %}
 </section>
 <p><a href="{{ url_for('journalist.dashboard') }}">&larr; Back to dashboard</a></p>
 {% endblock %}

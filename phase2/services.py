@@ -132,9 +132,17 @@ def reset_password(
     actor: User | None = None,
     ip: str | None = None,
     must_change_password: bool = True,
+    allow_admin: bool = False,
+    detail: str | None = None,
 ) -> User:
-    """Admin-initiated password reset (the old password is not required)."""
-    if user.is_admin and (actor is None or actor.id != user.id):
+    """Password reset without the old password (admin dashboard or CLI).
+
+    By default an admin account can only be reset by that same admin, so one
+    admin cannot take over another through the web UI.  ``allow_admin`` lifts
+    that guard and is passed only by the ``reset-password`` CLI command, whose
+    operator already has shell access to the server and its database.
+    """
+    if user.is_admin and not allow_admin and (actor is None or actor.id != user.id):
         raise ValueError("Another admin's password cannot be reset from here.")
     user.set_password(new_password, method=current_app.config["PASSWORD_HASH_METHOD"])
     user.must_change_password = must_change_password
@@ -144,6 +152,7 @@ def reset_password(
         "password.reset",
         actor=actor,
         target=user.username,
+        detail=detail,
         ip_address=ip,
         commit=False,
     )

@@ -6,7 +6,6 @@
   <h1>Privacy Preserving Anonymous Submission System</h1>
   <p class="lead">
     A secure channel between anonymous sources and authorized journalists.
-    Phase 2 provides the authentication and role-based access control layer.
   </p>
 </section>
 
@@ -19,10 +18,11 @@
       asked to identify themselves.
     </p>
     <p class="muted">
-      The submission portal itself is delivered in Phase 3. Phase 2 only
-      guarantees that reaching this site requires no identity.
+      You receive a random token after submitting. It is the only way to check
+      your report's status, so keep it safe.
     </p>
-    <span class="badge badge-pending">Submission portal &mdash; Phase 3</span>
+    <a class="btn" href="{{ url_for('source.submit') }}">Submit a report</a>
+    <a class="btn btn-ghost" href="{{ url_for('source.status') }}">Check status</a>
   </section>
 
   <section class="card">
@@ -45,13 +45,14 @@
 </div>
 
 <section class="panel">
-  <h2>What Phase 2 enforces</h2>
+  <h2>What the system enforces</h2>
   <ul class="tick-list">
     <li>Passwords are stored only as salted PBKDF2-HMAC-SHA256 hashes.</li>
     <li>Every protected route is checked on the server, not just hidden in the UI.</li>
     <li>Journalists move through PENDING &rarr; AUTHORIZED &rarr; DISABLED under admin control.</li>
     <li>Sessions are HttpOnly, SameSite, time-limited, and rebuilt at each sign-in.</li>
     <li>Every state-changing form carries a CSRF token.</li>
+    <li>Submission tokens are random and stored only as a hash; no source IP is kept.</li>
   </ul>
 </section>
 {% endblock %}

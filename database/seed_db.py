@@ -1,29 +1,31 @@
-import sqlite3
+"""Insert a demo anonymous submission into the unified database.
 
-DATABASE = "database/app.db"
+Phase 1's version also inserted a receiver account with a plaintext password;
+accounts are now created only through the hashed-password CLI commands
+(``flask --app app create-admin`` / ``create-journalist``).
+"""
 
-connection = sqlite3.connect(DATABASE)
-cursor = connection.cursor()
+import sys
+from pathlib import Path
 
-# Insert test user
-cursor.execute("""
-    INSERT OR IGNORE INTO users (username, password, role)
-    VALUES (?, ?, ?)
-""", ("admin", "test123", "receiver"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Insert test submission
-cursor.execute("""
-    INSERT OR IGNORE INTO submissions
-    (submission_token, title, content, status)
-    VALUES (?, ?, ?, ?)
-""", (
-    "TEST-TOKEN-001",
-    "Test Anonymous Report",
-    "This is a test submission for Phase 1.",
-    "Submitted"
-))
+from phase2 import create_app  # noqa: E402
+from phase2.extensions import db  # noqa: E402
+from submissions.services import create_submission  # noqa: E402
 
-connection.commit()
-connection.close()
 
-print("Test user and submission inserted successfully!")
+def seed():
+    app = create_app()
+    with app.app_context():
+        db.create_all()
+        submission, token = create_submission(
+            "Test Anonymous Report",
+            "This is a test submission created by database/seed_db.py.",
+        )
+        print(f"Demo submission #{submission.id} created.")
+        print(f"Its status token (shown once): {token}")
+
+
+if __name__ == "__main__":
+    seed()

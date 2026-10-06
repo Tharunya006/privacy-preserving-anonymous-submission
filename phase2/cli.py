@@ -1,4 +1,4 @@
-"""Flask CLI commands for Phase 2.
+"""Flask CLI commands for the unified application.
 
 The bootstrap admin is created here rather than through any web route: there is
 no public admin registration, and the password is supplied by the operator at
@@ -19,8 +19,9 @@ from flask import Flask
 from flask.cli import with_appcontext
 
 from .extensions import db
+from .forms import password_policy_error
 from .models import Role, Status, User, record_event
-from .services import create_admin, create_user, list_journalists, set_status
+from .services import create_admin, create_user, list_journalists, reset_password, set_status
 
 ALPHABET = string.ascii_letters + string.digits + "!@#$%^&*-_=+"
 
@@ -60,21 +61,24 @@ def register_cli(app: Flask) -> None:
     app.cli.add_command(create_journalist_command)
     app.cli.add_command(list_users_command)
     app.cli.add_command(set_status_command)
+    app.cli.add_command(reset_password_command)
 
 
 @click.command("init-db")
-@click.option("--drop", is_flag=True, help="Drop Phase 2 tables first (destructive).")
+@click.option("--drop", is_flag=True, help="Drop every table first (destructive).")
 @with_appcontext
 def init_db_command(drop: bool) -> None:
-    """Create the Phase 2 tables (phase2_users, phase2_audit_log)."""
+    """Create every table: accounts, audit log, submissions and evidence."""
     if drop:
         click.confirm(
-            "This deletes every Phase 2 account and audit record. Continue?", abort=True
+            "This deletes every account, audit record and anonymous submission. "
+            "Evidence files on disk are not removed. Continue?",
+            abort=True,
         )
         db.drop_all()
-        click.echo("Dropped Phase 2 tables.")
+        click.echo("Dropped all tables.")
     db.create_all()
-    click.echo("Phase 2 database is ready.")
+    click.echo("Database is ready.")
 
 
 @click.command("create-admin")
@@ -188,6 +192,53 @@ def set_status_command(username: str, status: str) -> None:
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"'{user.username}' is now {user.status}.")
+
+
+@click.command("reset-password")
+@click.option("--username", prompt=True, help="Account whose password is reset.")
+@with_appcontext
+def reset_password_command(username: str) -> None:
+    """Set a new password for an existing admin or journalist.
+
+    The password is typed twice with no echo, must satisfy the same policy as
+    the web forms, and is stored only as a hash.  Any lockout is cleared.  A
+    journalist must change the new password at next sign-in, because the
+    operator now knows it; an admin resetting their own account does not.
+    """
+    user = User.get_by_username(username)
+    if user is None:
+        raise click.ClickException(f"No such user: {username}")
+
+    def _check_policy(value: str) -> str:
+        error = password_policy_error(value)
+        if error:
+            raise click.UsageError(error)  # click.prompt shows it and asks again
+        return value
+
+    password = click.prompt(
+        "New password",
+        hide_input=True,
+        confirmation_prompt="Confirm new password",
+        value_proc=_check_policy,
+    )
+
+    try:
+        reset_password(
+            user,
+            password,
+            must_change_password=user.is_journalist,
+            allow_admin=True,
+            detail="via CLI",
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Password for '{user.username}' ({user.role}) has been reset.")
+    if user.must_change_password:
+        click.echo("They must change it at their next sign-in.")
+    if user.status != Status.AUTHORIZED.value:
+        click.echo(f"Note: the account is {user.status} and still cannot sign in.")
 
 
 __all__ = [

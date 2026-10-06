@@ -9,10 +9,17 @@
   <span class="badge badge-authorized">{{ user.status }}</span>
 </p>
 
+<div class="stat-row">
+  <div class="stat"><span class="stat-num">{{ submission_counts['TOTAL'] }}</span><span class="stat-label">Submissions</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span><span class="stat-label">New</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span><span class="stat-label">Under review</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['CLOSED'] }}</span><span class="stat-label">Closed</span></div>
+</div>
+
 <div class="card-grid">
   <section class="card">
     <h2>Submission inbox</h2>
-    <p>Anonymous submissions routed to you will appear here.</p>
+    <p>Read anonymous reports, download evidence and update their status.</p>
     <a class="btn btn-ghost" href="{{ url_for('journalist.inbox') }}">Open inbox</a>
   </section>
 
@@ -28,6 +35,27 @@
     <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change password</a>
   </section>
 </div>
+
+<section class="panel">
+  <h2>New submissions</h2>
+  {% if new_submissions %}
+    <table class="table">
+      <thead><tr><th>Ref.</th><th>Title</th><th>Received (UTC)</th></tr></thead>
+      <tbody>
+      {% for s in new_submissions %}
+        <tr>
+          <td class="nowrap">#{{ s.id }}</td>
+          <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{{ s.title }}</a></td>
+          <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="{{ url_for('journalist.inbox', status='SUBMITTED') }}">All new submissions &rarr;</a></p>
+  {% else %}
+    <p class="muted">No new submissions waiting for review.</p>
+  {% endif %}
+</section>
 
 <section class="panel">
   <h2>Access status</h2>

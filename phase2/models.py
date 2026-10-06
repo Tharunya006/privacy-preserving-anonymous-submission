@@ -1,9 +1,8 @@
 """Database models for Phase 2 (authentication & authorization).
 
-Only the ``User`` and ``AuditLog`` tables are defined here.  Submission-related
-tables belong to Phase 3 and can be added alongside these without changing
-anything below: ``AuditLog.user_id`` and any future ``Submission.receiver_id``
-both point at ``phase2_users.id``.
+Only the ``User`` and ``AuditLog`` tables are defined here.  The submission
+tables live in ``submissions/models.py`` on the same ``db`` and deliberately do
+not reference ``phase2_users``: a report is never linked to an identity.
 """
 
 from __future__ import annotations

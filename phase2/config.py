@@ -62,13 +62,26 @@ def normalise_database_uri(uri: str, root: Path = BASE_DIR) -> str:
     which would turn ``sqlite:///instance/phase2.db`` into ``instance/instance/
     phase2.db``.  Anchoring to the project root here keeps the database where
     the path says it is, whatever directory the ``flask`` command is run from.
+
+    The join is normalised lexically (``os.path.abspath``) rather than with
+    ``Path.resolve()``: resolving would follow symlinks and rewrite the path the
+    caller gave -- on macOS ``/tmp`` silently became ``/private/tmp``.
     """
     path = sqlite_file_path(uri)
     if path is None:
         return uri
     if path.is_absolute():
         return uri
-    return f"{_SQLITE_FILE_PREFIX}{(root / path).resolve().as_posix()}"
+    anchored = Path(os.path.abspath(root / path))
+    return f"{_SQLITE_FILE_PREFIX}{anchored.as_posix()}"
+
+
+def resolve_project_path(raw: str, root: Path = BASE_DIR) -> Path:
+    """Anchor a relative filesystem path to the project root."""
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    return Path(os.path.abspath(path))
 
 
 def ensure_database_directory(uri: str) -> None:
@@ -119,6 +132,19 @@ class BaseConfig:
     # --- Brute-force protection -------------------------------------------
     MAX_FAILED_LOGINS = _env_int("PHASE2_MAX_FAILED_LOGINS", 5)
     LOCKOUT_MINUTES = _env_int("PHASE2_LOCKOUT_MINUTES", 15)
+
+    # --- Anonymous submissions / evidence ---------------------------------
+    # Evidence files live outside every static folder, under instance/ (which
+    # is git-ignored), and are only ever served to authorized journalists.
+    EVIDENCE_DIR = str(
+        resolve_project_path(
+            os.environ.get("PHASE2_EVIDENCE_DIR") or str(INSTANCE_DIR / "evidence")
+        )
+    )
+    EVIDENCE_MAX_BYTES = _env_int("PHASE2_EVIDENCE_MAX_MB", 10) * 1024 * 1024
+    # Whole-request ceiling: the evidence limit plus room for the text fields.
+    # Anything larger is refused with 413 before the body is read.
+    MAX_CONTENT_LENGTH = EVIDENCE_MAX_BYTES + 1024 * 1024
 
     TESTING = False
     DEBUG = False

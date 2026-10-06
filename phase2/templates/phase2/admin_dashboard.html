@@ -12,6 +12,17 @@
   <div class="stat"><span class="stat-num">{{ counts['DISABLED'] }}</span><span class="stat-label">Disabled</span></div>
 </div>
 
+<h2>Anonymous submissions</h2>
+<div class="stat-row">
+  <div class="stat"><span class="stat-num">{{ submission_counts['TOTAL'] }}</span><span class="stat-label">Total</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span><span class="stat-label">Submitted</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span><span class="stat-label">Under review</span></div>
+  <div class="stat"><span class="stat-num">{{ submission_counts['CLOSED'] }}</span><span class="stat-label">Closed</span></div>
+</div>
+<p class="muted small">
+  Administrators see counts only. Report content is visible to authorized journalists.
+</p>
+
 <div class="action-row">
   <a class="btn" href="{{ url_for('admin.add_journalist') }}">Add journalist</a>
   <a class="btn btn-ghost" href="{{ url_for('admin.manage_journalists') }}">Manage journalists</a>

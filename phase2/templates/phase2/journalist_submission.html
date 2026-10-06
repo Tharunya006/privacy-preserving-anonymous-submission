@@ -1,0 +1,93 @@
+{% extends "phase2/base.html" %}
+{% block title %}Submission #{{ submission.id }}{% endblock %}
+
+{% block content %}
+<h1>{{ submission.title }}</h1>
+<p>
+  <span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span>
+  <span class="muted small">Submission #{{ submission.id }}</span>
+</p>
+<p class="muted small">
+  The source is anonymous: no name, account, IP address or session is stored with
+  this report.
+</p>
+
+<section class="panel">
+  <h2>Report</h2>
+  <div class="report-body">{{ submission.content }}</div>
+</section>
+
+<section class="panel">
+  <h2>Details</h2>
+  <dl class="detail-list">
+    <dt>Received</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+    <dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Evidence</h2>
+  {% if submission.evidence %}
+    <p class="hint hint-warn">
+      Files are downloaded exactly as the source uploaded them. Open them in an
+      isolated environment.
+    </p>
+    <table class="table">
+      <thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead>
+      <tbody>
+      {% for e in submission.evidence %}
+        <tr>
+          <td><code>{{ e.download_name }}</code></td>
+          <td>{{ e.extension|upper }}</td>
+          <td class="nowrap">{{ '%.1f'|format(e.size_bytes / 1024) }} KB</td>
+          <td>
+            <a class="btn btn-small btn-ghost"
+               href="{{ url_for('journalist.download_evidence', submission_id=submission.id, evidence_id=e.id) }}">Download</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No evidence was attached.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Status</h2>
+  <p class="muted small">Workflow: Submitted &rarr; Under review &rarr; Closed.</p>
+  {% if next_statuses %}
+    <div class="action-row">
+    {% for s in next_statuses %}
+      <form method="post" action="{{ url_for('journalist.update_submission_status', submission_id=submission.id) }}"
+            class="inline-form"
+            {% if s.value == 'CLOSED' %}data-confirm="Close submission #{{ submission.id }}? Closed is final."{% endif %}>
+        {{ status_form.hidden_tag() }}
+        <input type="hidden" name="status" value="{{ s.value }}">
+        <button class="btn" type="submit">Mark as {{ s.label }}</button>
+      </form>
+    {% endfor %}
+    </div>
+  {% else %}
+    <p>This submission is closed. No further status changes are possible.</p>
+  {% endif %}
+
+  {% if history %}
+  <h3>History</h3>
+  <table class="table">
+    <thead><tr><th>Time (UTC)</th><th>Change</th><th>By</th></tr></thead>
+    <tbody>
+    {% for e in history %}
+      <tr>
+        <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ e.detail }}</td>
+        <td>{{ e.actor_username or '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<p><a href="{{ url_for('journalist.inbox') }}">&larr; Back to inbox</a></p>
+{% endblock %}

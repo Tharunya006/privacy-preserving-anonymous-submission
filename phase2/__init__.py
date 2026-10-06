@@ -1,9 +1,10 @@
 """Phase 2 -- Authentication & Authorization.
 
-Self-contained Flask application package for the Privacy Preserving Anonymous
-Submission System.  It runs standalone via ``phase2_app.py`` today and is
-designed to be registered onto the Phase 1 application later without changing
-any Phase 1 file (see ``docs/integration_notes.md``).
+Owns the application factory for the unified Privacy Preserving Anonymous
+Submission System.  ``create_app`` builds the one Flask app: Phase 2's
+authentication, RBAC and dashboards plus the Phase 1 anonymous submission portal
+(the ``submissions`` package), all sharing one SQLAlchemy database.  The entry
+point is ``app.py`` (see ``docs/integration_notes.md``).
 """
 
 from __future__ import annotations
@@ -34,11 +35,15 @@ PASSWORD_CHANGE_EXEMPT = {
     "main.unauthorized",
     "static",
     "phase2_static",
+    # Public source pages never require an account, so never gate them.
+    "source.submit",
+    "source.status",
+    "source.legacy_login",
 }
 
 
 def create_app(config_name: str | None = None, **overrides) -> Flask:
-    """Application factory for the standalone Phase 2 app."""
+    """Application factory for the unified application."""
     app = Flask(
         __name__,
         instance_path=str(INSTANCE_DIR),
@@ -59,6 +64,9 @@ def create_app(config_name: str | None = None, **overrides) -> Flask:
     db.init_app(app)
     csrf.init_app(app)
 
+    from submissions import register_submissions
+
+    register_submissions(app)
     register_phase2(app)
     _register_error_handlers(app)
     _register_security_headers(app)
@@ -72,12 +80,8 @@ def create_app(config_name: str | None = None, **overrides) -> Flask:
 def register_phase2(app: Flask, url_prefix: str = "") -> Flask:
     """Attach Phase 2 blueprints and hooks to *any* Flask app.
 
-    This is the single entry point Phase 1 will call at merge time::
-
-        from phase2 import register_phase2
-        register_phase2(app)
-
-    It assumes ``db`` and ``csrf`` are already initialised on ``app``.
+    Called by ``create_app``; kept separate so the auth layer can be mounted
+    on any app.  It assumes ``db`` and ``csrf`` are already initialised.
     """
     from .blueprints import admin as admin_bp
     from .blueprints import auth as auth_bp
@@ -85,8 +89,8 @@ def register_phase2(app: Flask, url_prefix: str = "") -> Flask:
     from .blueprints import main as main_bp
     from .security import current_user, load_current_user, reset_user_cache
 
-    # The public landing page is only registered when Phase 2 owns the root;
-    # after the merge Phase 1 keeps "/" and this is skipped.
+    # The public landing page (which links to the submission portal) is only
+    # registered when no other blueprint named "main" already owns the root.
     if "main" not in app.blueprints:
         app.register_blueprint(main_bp.bp, url_prefix=url_prefix or None)
     app.register_blueprint(auth_bp.bp, url_prefix=f"{url_prefix}/auth")
@@ -117,7 +121,9 @@ def register_phase2(app: Flask, url_prefix: str = "") -> Flask:
 
         return {
             "current_user": current_user,
-            "logout_form": EmptyForm(),
+            # Render-only token holder: formdata=None so building it never reads
+            # the request body (which would re-raise 413 on an oversize upload).
+            "logout_form": EmptyForm(formdata=None),
             "Role": Role,
             "Status": Status,
             "phase2_version": __version__,
@@ -168,6 +174,21 @@ def _register_error_handlers(app: Flask) -> None:
         return render_template("phase2/error.html", code=405,
                                message="Method not allowed.", user=current_user()), 405
 
+    @app.errorhandler(413)
+    def _too_large(error):
+        limit_mb = app.config.get("EVIDENCE_MAX_BYTES", 0) // (1024 * 1024)
+        return render_template("phase2/error.html", code=413,
+                               message=f"The upload is too large. Evidence files may be "
+                                       f"at most {limit_mb} MB.",
+                               user=current_user()), 413
+
+    @app.errorhandler(500)
+    def _server_error(error):
+        db.session.rollback()
+        return render_template("phase2/error.html", code=500,
+                               message="Something went wrong on our side. Please try again.",
+                               user=current_user()), 500
+
     from flask_wtf.csrf import CSRFError
 
     @app.errorhandler(CSRFError)
@@ -199,7 +220,9 @@ def _register_security_headers(app: Flask) -> None:
         response.headers.setdefault(
             "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
         )
-        if request.path.startswith(("/auth", "/admin", "/journalist")):
+        # Never cache authenticated pages, or the source pages that display a
+        # submission token or a report's status.
+        if request.path.startswith(("/auth", "/admin", "/journalist", "/submit", "/status")):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
             response.headers["Pragma"] = "no-cache"
         return response

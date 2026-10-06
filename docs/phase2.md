@@ -5,18 +5,19 @@ identity and access control for the two account holders in the system —
 **administrators** and **journalists (authorized receivers)** — while keeping
 anonymous sources completely account-free.
 
-Phase 2 runs standalone from `phase2_app.py`. It does not import, modify, or
-depend on any Phase 1 file.
+Phase 2 is now integrated with the Phase 1 submission portal into one Flask
+application (`app.py`) and one database — see
+[`integration_notes.md`](integration_notes.md) for the final architecture.
 
 ---
 
 ## 1. Architecture
 
 ```
-phase2_app.py                 entry point  -> create_app()
+app.py                        entry point  -> create_app()
 │
 └── phase2/                   the Phase 2 package
-    ├── __init__.py           app factory + register_phase2() merge hook
+    ├── __init__.py           app factory (whole app) + register_phase2()
     ├── config.py             environment-driven settings (no secrets in code)
     ├── extensions.py         db (SQLAlchemy) and csrf (CSRFProtect) singletons
     ├── models.py             User, AuditLog, Role, Status
@@ -163,8 +164,9 @@ click — no waiting for a session to expire.
 
 ## 4. Database structure
 
-SQLite, at `instance/phase2.db`. Both tables are prefixed `phase2_` so they can
-never collide with a Phase 1 table.
+SQLite, at `instance/phase2.db` — the single database of the integrated app.
+Phase 2's tables are prefixed `phase2_`; the submission tables
+(`submissions`, `submission_evidence`) are described in `integration_notes.md`.
 
 ### `phase2_users`
 
@@ -193,15 +195,17 @@ by SQLite even if application code were bypassed.
 `id`, `created_at`, `actor_id`, `actor_username`, `action`, `target`, `detail`,
 `ip_address`. Append-only. Records `login.success`, `login.failed`,
 `login.blocked`, `logout`, `journalist.created`, `status.authorized`,
-`status.disabled`, `password.changed`, `password.reset`, `admin.bootstrapped`.
-Passwords and hashes are never written to it.
+`status.disabled`, `password.changed`, `password.reset`, `admin.bootstrapped`,
+and since the integration `submission.created`, `submission.viewed`,
+`submission.status_changed`, `evidence.downloaded`.
+Passwords, hashes, submission tokens and report content are never written to it,
+and submission events carry no source IP.
 
-### Designed for later phases
+### Submissions
 
-`AuditLog.actor_id` already points at `phase2_users.id`. Phase 3's
-`Submission` table attaches the same way — e.g.
-`receiver_id = db.Column(db.Integer, db.ForeignKey("phase2_users.id"))` — with
-no change to the tables above.
+Submissions deliberately have **no** foreign key to `phase2_users`: a report is
+never linked to an identity. Which journalist read or changed a report is
+recorded in the audit log instead.
 
 ---
 
@@ -212,7 +216,7 @@ no change to the tables above.
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements-phase2.txt
+pip install -r requirements.txt
 ```
 
 ### Configure
@@ -230,17 +234,17 @@ mode refuses to start at all.
 ### Initialise the database
 
 ```bash
-flask --app phase2_app init-db
+flask --app app init-db
 ```
 
 ### Create the first admin (bootstrap)
 
 ```bash
-flask --app phase2_app create-admin --username admin
+flask --app app create-admin --username admin
 # prompts for the password twice, invisibly
 
 # or, for a generated one printed exactly once:
-flask --app phase2_app create-admin --username admin --generate-password
+flask --app app create-admin --username admin --generate-password
 ```
 
 There is deliberately **no public admin registration route** — the CLI is the
@@ -250,21 +254,20 @@ only way an admin comes into existence.
 ### Run
 
 ```bash
-python phase2_app.py            # http://127.0.0.1:5001
+python app.py                   # http://127.0.0.1:5001
 # or
-flask --app phase2_app run --port 5001
+flask --app app run --port 5001
 ```
 
-Port 5001 keeps Phase 2 out of Phase 1's way on port 5000, so both can run
-side by side.
+Port 5001 is the default because macOS reserves port 5000 for AirPlay.
 
 ### Other CLI commands
 
 ```bash
-flask --app phase2_app list-users
-flask --app phase2_app create-journalist --username alice [--authorize]
-flask --app phase2_app set-status alice AUTHORIZED
-flask --app phase2_app init-db --drop        # destructive, asks first
+flask --app app list-users
+flask --app app create-journalist --username alice [--authorize]
+flask --app app set-status alice AUTHORIZED
+flask --app app init-db --drop        # destructive, asks first
 ```
 
 ---
@@ -272,7 +275,7 @@ flask --app phase2_app init-db --drop        # destructive, asks first
 ## 6. How to run the tests
 
 ```bash
-pytest                    # all 148 tests
+pytest                    # the whole suite
 pytest -v                 # verbose
 pytest tests/test_rbac.py # one module
 pytest -k "csrf"          # by keyword
@@ -287,6 +290,9 @@ is never touched and nothing is left behind.
 | `tests/test_admin.py` | journalist creation, duplicate/weak input, authorize, disable, lockout clearing, password reset, audit entries |
 | `tests/test_rbac.py` | unauthenticated access, journalist→admin blocked, admin→journalist blocked, role-change revocation, forced password change, security headers |
 | `tests/test_models.py` | hashing, salting, write-only password, status rules, username rules, table namespacing |
+| `tests/test_submissions.py` | anonymous submit/status, random hashed tokens, escaping, evidence storage and download, journalist workflow, submission RBAC |
+| `tests/test_phase4.py` | Phase 4: dashboard/inbox access, filtering, pagination, report view, status workflow, audit, evidence and path traversal, XSS, CSRF |
+| `tests/test_requirements.py` | `requirements.txt` stays plain UTF-8 and parseable |
 | `tests/test_csrf.py` | tokens present; POSTs without/with forged tokens refused |
 | `tests/test_cli.py` | bootstrap commands, generated password strength, no hard-coded secrets |
 
@@ -313,9 +319,11 @@ is never touched and nothing is left behind.
 | GET | `/journalist/`, `/journalist/dashboard` | **JOURNALIST + AUTHORIZED** |
 | GET | `/journalist/profile` | **JOURNALIST + AUTHORIZED** |
 | GET | `/journalist/inbox` | **JOURNALIST + AUTHORIZED** |
-
-`/journalist/inbox` is an empty placeholder whose *access boundary* is built and
-tested now; its contents arrive in Phase 3/4.
+| GET | `/journalist/submissions/<id>` | **JOURNALIST + AUTHORIZED** (audited) |
+| POST | `/journalist/submissions/<id>/status` | **JOURNALIST + AUTHORIZED**, CSRF — see `phase4.md` |
+| GET | `/journalist/submissions/<id>/evidence/<eid>` | **JOURNALIST + AUTHORIZED** (audited) |
+| GET/POST | `/submit`, `/status` | **public** — anonymous sources, CSRF |
+| GET | `/login` | public — 301 to `/auth/login` (Phase 1's old URL) |
 
 ---
 
@@ -361,4 +369,6 @@ tested now; its contents arrive in Phase 3/4.
   forged, but they also cannot be revoked server-side before the next request —
   in practice the per-request database check closes that window.
 * The audit log stores an IP address, which is fine for admin and journalist
-  accounts but must **not** be extended to anonymous submissions in Phase 3.
+  accounts; submission events never carry one.
+* Client IPs are read from `X-Forwarded-For` when present, which a client can
+  spoof unless the app sits behind a proxy that overwrites the header.

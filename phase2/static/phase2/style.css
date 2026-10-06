@@ -92,7 +92,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .6rem; }
 .field-check label { display: inline; font-weight: 500; margin: 0; }
 .field-check .hint { width: 100%; margin: .2rem 0 0; }
 
-input[type="text"], input[type="password"], input[type="email"], select {
+input[type="text"], input[type="password"], input[type="email"], select, textarea {
   width: 100%; padding: .55rem .65rem;
   border: 1px solid var(--line); border-radius: var(--radius);
   font: inherit; background: #fff; color: var(--ink);
@@ -102,6 +102,8 @@ input:focus, select:focus, button:focus {
 }
 .hint { font-size: .8rem; color: var(--ink-soft); margin: .25rem 0 0; }
 .field-error { color: var(--danger); font-size: .84rem; margin: .25rem 0 0; }
+.hint-warn { color: var(--warn); }
+textarea { resize: vertical; }
 
 /* ---------- Buttons ---------- */
 .btn, button[type="submit"], input[type="submit"] {
@@ -150,6 +152,19 @@ input:focus, select:focus, button:focus {
 .badge-pending { color: var(--warn); background: #fdf3dc; }
 .badge-disabled { color: var(--danger); background: #fbeaea; }
 .badge-temp { color: var(--warn); background: #fdf3dc; }
+.badge-sub-submitted { color: var(--accent); background: #e8eef5; }
+.badge-sub-under_review { color: var(--warn); background: #fdf3dc; }
+.badge-sub-closed { color: var(--ok); background: #e5f4ec; }
+
+/* ---------- Submissions ---------- */
+.token-box code {
+  display: inline-block; font-size: 1.05rem; padding: .5rem .75rem;
+  background: #eef1f5; border-radius: var(--radius); word-break: break-all;
+  user-select: all;
+}
+.report-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pager { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+h3 { font-size: 1rem; margin: 1.1rem 0 .5rem; }
 
 /* ---------- Flash messages ---------- */
 .flashes { list-style: none; padding: 0; margin: 0 0 1.1rem; }

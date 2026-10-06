@@ -1,0 +1,37 @@
+{% extends "phase2/base.html" %}
+{% block title %}Check submission status{% endblock %}
+
+{% block content %}
+<h1>Check submission status</h1>
+
+{% if submission %}
+<section class="panel">
+  <h2>Submission status</h2>
+  <dl class="detail-list">
+    <dt>Title</dt><dd>{{ submission.title }}</dd>
+    <dt>Status</dt><dd><span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span></dd>
+    <dt>Submitted</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+    <dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+  </dl>
+</section>
+{% elif not_found %}
+<section class="panel panel-error">
+  <h2>Submission not found</h2>
+  <p>No submission was found with this token. Check it and try again.</p>
+</section>
+{% endif %}
+
+<p class="muted">Enter the token from your receipt to check the status of your report.</p>
+
+<form method="post" action="{{ url_for('source.status') }}" class="panel form-panel" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="field">
+    {{ form.token.label }}
+    {{ form.token(required=true, maxlength=128, autocomplete="off",
+                  placeholder="Enter your submission token") }}
+    {% for error in form.token.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+  {{ form.submit(class="btn") }}
+  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Back to home</a>
+</form>
+{% endblock %}

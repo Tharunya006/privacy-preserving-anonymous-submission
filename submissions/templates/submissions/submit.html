@@ -1,0 +1,45 @@
+{% extends "phase2/base.html" %}
+{% block title %}Submit a report{% endblock %}
+
+{% block content %}
+<h1>Anonymous submission</h1>
+<p class="muted">
+  Submit your information without creating an account. No login, no email and no
+  name are asked for, and your IP address is not stored with the report.
+</p>
+
+<form method="post" action="{{ url_for('source.submit') }}" enctype="multipart/form-data"
+      class="panel form-panel" novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="field">
+    {{ form.title.label }}
+    {{ form.title(required=true, maxlength=200, autocomplete="off") }}
+    {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.content.label }}
+    {{ form.content(required=true, rows=10, maxlength=20000) }}
+    {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="field">
+    {{ form.evidence.label }}
+    {{ form.evidence(accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.gif,.docx,.xlsx,.odt") }}
+    <p class="hint">
+      Optional. PDF, text, CSV, image or office documents, up to
+      {{ config['EVIDENCE_MAX_BYTES'] // (1024 * 1024) }} MB.
+    </p>
+    <p class="hint hint-warn">
+      Files are stored exactly as uploaded &mdash; hidden metadata (author names, GPS
+      location, device details) is <strong>not removed yet</strong>. Strip it before
+      uploading if it could identify you.
+    </p>
+    {% for error in form.evidence.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  {{ form.submit(class="btn") }}
+  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "phase2/base.html" %}
+{% block title %}Submission received{% endblock %}
+
+{% block content %}
+<h1>Submission received</h1>
+
+<section class="panel">
+  <p>Your report has been stored. Keep this token to check its status later:</p>
+  <p class="token-box"><code>{{ token }}</code></p>
+  <p class="hint hint-warn">
+    This is the <strong>only</strong> time the token is shown. It is not stored in
+    readable form and cannot be recovered, so copy it somewhere safe now.
+  </p>
+  <dl class="detail-list">
+    <dt>Title</dt><dd>{{ submission.title }}</dd>
+    <dt>Status</dt><dd><span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span></dd>
+    <dt>Evidence files</dt><dd>{{ submission.evidence|length }}</dd>
+  </dl>
+</section>
+
+<div class="action-row">
+  <a class="btn" href="{{ url_for('source.status') }}">Check status</a>
+  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Back to home</a>
+</div>
+{% endblock %}

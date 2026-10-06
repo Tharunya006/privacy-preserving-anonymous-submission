@@ -1,8 +1,7 @@
-"""Shared Flask extension objects for Phase 2.
+"""Shared Flask extension objects.
 
-These live in their own module so that, at merge time, Phase 2 can be pointed
-at Phase 1's SQLAlchemy instance instead of its own (see
-``docs/integration_notes.md``).
+The single ``db`` instance here backs the whole application: Phase 2's account
+and audit tables and the ``submissions`` package's tables live in one database.
 """
 
 from __future__ import annotations

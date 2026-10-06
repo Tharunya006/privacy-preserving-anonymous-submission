@@ -21,7 +21,9 @@ from flask import (
 from ..extensions import db
 from ..forms import CreateJournalistForm, EmptyForm, ResetPasswordForm, StatusActionForm
 from ..models import AuditLog, Role, Status, User, record_event
-from ..security import admin_required, role_required
+from ..security import admin_required, is_safe_redirect_target, role_required
+from submissions.services import submission_counts
+
 from ..services import (
     create_user,
     journalist_counts,
@@ -69,6 +71,8 @@ def dashboard():
         pending=pending,
         recent_events=recent_events,
         action_form=StatusActionForm(),
+        # Counts only: admins manage accounts and never read report content.
+        submission_counts=submission_counts(),
     )
 
 
@@ -163,7 +167,10 @@ def change_status(user_id: int):
         return redirect(url_for("admin.manage_journalists"))
 
     flash(f"'{target.username}' is now {target.status}.", "success")
-    return redirect(request.form.get("return_to") or url_for("admin.manage_journalists"))
+    return_to = request.form.get("return_to")
+    if not is_safe_redirect_target(return_to):
+        return_to = url_for("admin.manage_journalists")
+    return redirect(return_to)
 
 
 @bp.route("/journalists/<int:user_id>", methods=["GET"])

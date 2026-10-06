@@ -29,15 +29,18 @@ EMAIL_PATTERN = r"^[^@\s]+@[^@\s.]+\.[^@\s]+$"
 EMAIL_MESSAGE = "Enter a valid email address."
 
 
-def validate_password_strength(form, field) -> None:
-    """Length + character-class policy, enforced server-side."""
-    password = field.data or ""
+def password_policy_error(password: str) -> str | None:
+    """Length + character-class policy.  Returns the problem, or ``None`` if OK.
+
+    The single definition of the policy: the forms below and the CLI's
+    ``reset-password`` command both call it.
+    """
     minimum = current_app.config.get("PASSWORD_MIN_LENGTH", 10)
 
     if len(password) < minimum:
-        raise ValidationError(f"Password must be at least {minimum} characters long.")
+        return f"Password must be at least {minimum} characters long."
     if len(password) > 128:
-        raise ValidationError("Password must be at most 128 characters long.")
+        return "Password must be at most 128 characters long."
     checks = [
         (r"[a-z]", "one lowercase letter"),
         (r"[A-Z]", "one uppercase letter"),
@@ -46,7 +49,15 @@ def validate_password_strength(form, field) -> None:
     ]
     missing = [label for pattern, label in checks if not re.search(pattern, password)]
     if missing:
-        raise ValidationError("Password must contain at least " + ", ".join(missing) + ".")
+        return "Password must contain at least " + ", ".join(missing) + "."
+    return None
+
+
+def validate_password_strength(form, field) -> None:
+    """WTForms validator: the password policy, enforced server-side."""
+    error = password_policy_error(field.data or "")
+    if error:
+        raise ValidationError(error)
 
 
 class LoginForm(FlaskForm):
