@@ -26,15 +26,20 @@
 
   <div class="field">
     {{ form.evidence.label }}
-    {{ form.evidence(accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.gif,.docx,.xlsx,.odt") }}
+    {{ form.evidence(accept=".jpg,.jpeg,.png,.gif,.webp,.txt,.csv") }}
     <p class="hint">
-      Optional. PDF, text, CSV, image or office documents, up to
+      Optional. Images (JPEG, PNG, GIF, WebP) or plain text / CSV, up to
       {{ config['EVIDENCE_MAX_BYTES'] // (1024 * 1024) }} MB.
     </p>
+    <p class="hint">
+      Hidden image metadata &mdash; GPS location, camera make, model and serial number,
+      date taken, editing software &mdash; is <strong>removed automatically before the
+      file is stored</strong>; the original is never saved. Documents such as PDF or
+      Word files are not accepted, because their author details cannot be removed.
+    </p>
     <p class="hint hint-warn">
-      Files are stored exactly as uploaded &mdash; hidden metadata (author names, GPS
-      location, device details) is <strong>not removed yet</strong>. Strip it before
-      uploading if it could identify you.
+      Metadata removal cannot hide what is <em>visible</em> in a picture (faces,
+      reflections, screens, landmarks). Check the content itself before sending.
     </p>
     {% for error in form.evidence.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
   </div>

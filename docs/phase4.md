@@ -3,7 +3,7 @@
 Phase 4 gives authorized journalists everything they need to work with
 anonymous submissions: a real inbox, the report view, secure evidence download,
 and the `Submitted → Under review → Closed` status workflow. It is built
-**into** the integrated Phase 1 + Phase 2 application — same Flask app, same
+**into** the integrated application (Phase 1 + 2 + 3 + 4) — same Flask app, same
 database, same authentication, RBAC, CSRF and session system, same audit log.
 
 ---
@@ -85,7 +85,8 @@ SUBMITTED ──► UNDER_REVIEW ──► CLOSED   (final)
 ### Evidence — `GET /journalist/submissions/<id>/evidence/<evidence_id>`
 
 Reuses the existing evidence storage (random names in `instance/evidence/`,
-outside every static folder). Downloads are:
+outside every static folder). Every stored file has already had its metadata
+removed by Phase 3 (see [`phase3.md`](phase3.md)). Downloads are:
 
 * journalist-only, audited as `evidence.downloaded`;
 * always `Content-Disposition: attachment` with
@@ -160,9 +161,6 @@ An existing `instance/phase2.db` needs no migration.
 
 * **No encryption at rest** (Phase 5): report text and evidence are stored in
   plaintext in SQLite and on disk.
-* **No metadata scrubbing** in this branch: evidence is stored as uploaded. A
-  Phase 3 scrubber exists on `origin/bhavya/phase3`, written against the
-  pre-integration Phase 1 app; it is not merged here.
 * **No real-time updates / traffic-analysis defences** (Phase 6).
 * A closed report cannot be reopened; there is no per-journalist assignment —
   every authorized journalist sees every report.

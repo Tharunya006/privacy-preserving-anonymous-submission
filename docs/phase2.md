@@ -291,6 +291,7 @@ is never touched and nothing is left behind.
 | `tests/test_rbac.py` | unauthenticated access, journalist→admin blocked, admin→journalist blocked, role-change revocation, forced password change, security headers |
 | `tests/test_models.py` | hashing, salting, write-only password, status rules, username rules, table namespacing |
 | `tests/test_submissions.py` | anonymous submit/status, random hashed tokens, escaping, evidence storage and download, journalist workflow, submission RBAC |
+| `tests/test_phase3.py` | Phase 3: EXIF/GPS/XMP/ICC removal per format, corrupt/fake/bomb images, clean-only storage, no disk spooling, `scrub-evidence` |
 | `tests/test_phase4.py` | Phase 4: dashboard/inbox access, filtering, pagination, report view, status workflow, audit, evidence and path traversal, XSS, CSRF |
 | `tests/test_requirements.py` | `requirements.txt` stays plain UTF-8 and parseable |
 | `tests/test_csrf.py` | tokens present; POSTs without/with forged tokens refused |

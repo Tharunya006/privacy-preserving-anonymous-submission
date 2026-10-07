@@ -1,7 +1,8 @@
-# Integration Notes — Phase 1 + Phase 2 + Phase 4
+# Integration Notes — Phase 1 + Phase 2 + Phase 3 + Phase 4
 
 Phase 1 (anonymous submission portal), Phase 2 (authentication &
-authorization) and Phase 4 (journalist workflow — see
+authorization), Phase 3 (evidence metadata scrubbing — see
+[`phase3.md`](phase3.md)) and Phase 4 (journalist workflow — see
 [`phase4.md`](phase4.md)) are integrated into **one Flask application** backed
 by **one database**. This document describes the final architecture, what changed
 during the integration, and how to run the result.
@@ -30,6 +31,7 @@ flask --app app create-journalist --username alice [--authorize]
 flask --app app set-status alice AUTHORIZED
 flask --app app reset-password --username admin   # prompts twice, no echo
 flask --app app list-users
+flask --app app scrub-evidence [--dry-run]        # clean evidence stored before Phase 3
 python database/init_db.py             # same as `flask --app app init-db`
 python database/seed_db.py             # adds one demo submission, prints its token
 pytest                                 # full test suite
@@ -65,9 +67,11 @@ app.py                         the single entry point  -> phase2.create_app()
 │   └── static/phase2/         style.css, app.js
 │
 ├── submissions/               anonymous submission portal (Phase 1, rebuilt)
-│   ├── __init__.py            register_submissions(app)
+│   ├── __init__.py            register_submissions(app); in-memory upload request
 │   ├── models.py              Submission, Evidence (on phase2's `db`)
 │   ├── services.py            tokens, validation, evidence storage, workflow
+│   ├── scrubber.py            Phase 3: metadata removal (Pillow) before storage
+│   ├── cli.py                 scrub-evidence (clean pre-Phase-3 evidence)
 │   ├── forms.py               WTForms (validation + CSRF)
 │   ├── routes.py              "source" blueprint: /submit, /status, /login
 │   └── templates/submissions/ submit, receipt, status pages
@@ -122,7 +126,9 @@ foreign key to `phase2_users`: a report is never linked to an identity.
 
 `id`, `submission_id` (FK), `stored_name` (random, unique), `extension`,
 `size_bytes`, `created_at`. The source's original filename is **not** kept — it
-can identify a person or machine.
+can identify a person or machine. The stored file is the **scrubbed** one
+(Phase 3): images re-encoded without EXIF/GPS/XMP/ICC/comments/text chunks,
+or plain UTF-8 text. Only JPEG, PNG, GIF, WebP, TXT and CSV are accepted.
 
 Files live in `instance/evidence/` (override with `PHASE2_EVIDENCE_DIR`),
 outside every static folder, with `0600` permissions.
@@ -179,7 +185,7 @@ published every submission to anyone).
 | Public `/test-submissions` listed every report | Removed; reports only via `/journalist/*` |
 | No validation / error handling | WTForms validation (required, length), 400 on bad input, 404 for unknown tokens, 413 for oversize uploads, generic 500 page |
 | No CSRF protection | Flask-WTF CSRF on every form, including the public ones |
-| Evidence field silently did nothing (no `enctype`) | Uploads work: extension allow-list, per-file size limit, random names, private directory, journalist-only attachment download |
+| Evidence field silently did nothing (no `enctype`) | Uploads work: extension allow-list, per-file size limit, metadata scrubbing (Phase 3), random names, private directory, journalist-only attachment download |
 | Raw `sqlite3` with a cwd-relative path | SQLAlchemy on the shared, cwd-independent database |
 | `requirements.txt` was UTF-16 (git treated it as binary) | Converted to UTF-8; Phase 2 requirements folded in |
 
@@ -210,11 +216,6 @@ All settings come from the environment (`.env`, git-ignored); see
 
 ## 8. Not done yet (later phases)
 
-* **Phase 3 — metadata scrubbing.** Evidence is stored exactly as uploaded; the
-  submit page warns sources about this. The hook point is marked in
-  `submissions/services.py::create_submission`. A scrubber exists on
-  `origin/bhavya/phase3`, but it targets the pre-integration Phase 1 app and is
-  not merged.
 * **Phase 5 — AES/HMAC cryptography.** Report content and evidence are stored
   unencrypted at rest.
 * **Phase 6 — WebSocket channel / traffic analysis.** The Flask-SocketIO pins

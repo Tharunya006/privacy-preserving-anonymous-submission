@@ -22,14 +22,13 @@ def submit():
     if form.validate_on_submit():
         try:
             evidence = read_evidence(form.evidence.data)
-        except EvidenceError as exc:
-            form.evidence.errors = list(form.evidence.errors) + [str(exc)]
-            return render_template("submissions/submit.html", form=form), 400
-
-        try:
+            # Metadata is scrubbed inside create_submission, before storage.
             submission, token = create_submission(
                 form.title.data, form.content.data, evidence
             )
+        except EvidenceError as exc:
+            form.evidence.errors = list(form.evidence.errors) + [str(exc)]
+            return render_template("submissions/submit.html", form=form), 400
         except ValueError as exc:
             form.content.errors = list(form.content.errors) + [str(exc)]
             return render_template("submissions/submit.html", form=form), 400

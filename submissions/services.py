@@ -22,6 +22,7 @@ from phase2.extensions import db
 from phase2.models import AuditLog, User, record_event, utcnow
 
 from .models import STATUS_LABELS, Evidence, Submission, SubmissionStatus
+from .scrubber import SCRUBBABLE_EXTENSIONS, ScrubError, scrub_evidence
 
 TITLE_MAX_LENGTH = 200
 CONTENT_MAX_LENGTH = 20_000
@@ -30,9 +31,9 @@ TOKEN_MAX_LENGTH = 128
 # 24 random bytes -> 32 URL-safe characters (192 bits): infeasible to guess.
 TOKEN_BYTES = 24
 
-ALLOWED_EVIDENCE_EXTENSIONS = frozenset(
-    {"pdf", "txt", "csv", "png", "jpg", "jpeg", "gif", "docx", "xlsx", "odt"}
-)
+# Only types whose metadata can be removed (Phase 3): images are re-encoded
+# without metadata, plain text has none.  PDF / office documents are refused.
+ALLOWED_EVIDENCE_EXTENSIONS = SCRUBBABLE_EXTENSIONS
 
 
 # The only shape a stored evidence name can take (see _write_evidence_file).
@@ -150,9 +151,21 @@ def create_submission(
 
     The token is returned exactly once, for the receipt page; it is not stored.
     Nothing about the source (IP, session, user agent) is recorded.
+
+    Evidence is scrubbed of metadata here, in memory, before any database or
+    disk write -- every caller goes through this, so unscrubbed evidence cannot
+    be stored.  If it cannot be cleaned, ``EvidenceError`` is raised and nothing
+    at all is saved.
     """
     title = _clean_text(title, "Title", TITLE_MAX_LENGTH)
     content = _clean_text(content, "Report", CONTENT_MAX_LENGTH)
+
+    if evidence is not None:
+        raw_extension, raw_data = evidence
+        try:
+            evidence = scrub_evidence(raw_extension, raw_data)
+        except ScrubError as exc:
+            raise EvidenceError(str(exc)) from exc
 
     for _ in range(3):
         token = generate_token()
@@ -169,9 +182,7 @@ def create_submission(
     written: Path | None = None
     try:
         if evidence is not None:
-            extension, data = evidence
-            # Phase 3 hook: metadata scrubbing of ``data`` belongs here, before
-            # the bytes reach the disk.  Files are stored as uploaded until then.
+            extension, data = evidence  # already scrubbed above
             written = _write_evidence_file(extension, data)
             submission.evidence.append(
                 Evidence(stored_name=written.name, extension=extension, size_bytes=len(data))

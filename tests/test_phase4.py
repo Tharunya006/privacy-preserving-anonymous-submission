@@ -37,7 +37,7 @@ def submission(app):
 
 @pytest.fixture()
 def submission_with_evidence(app):
-    sub, _token = create_submission("With evidence", "Body", ("pdf", b"%PDF-1.4 evidence"))
+    sub, _token = create_submission("With evidence", "Body", ("txt", b"PLAIN-TEXT-EVIDENCE"))
     return sub
 
 
@@ -364,22 +364,22 @@ class TestEvidenceAccess:
         evidence = submission_with_evidence.evidence[0]
         response = journalist_client.get(evidence_url(submission_with_evidence.id, evidence.id))
         assert response.status_code == 200
-        assert response.data == b"%PDF-1.4 evidence"
+        assert response.data == b"PLAIN-TEXT-EVIDENCE"
         assert response.headers["Content-Type"] == "application/octet-stream"
         disposition = response.headers["Content-Disposition"]
         assert disposition.startswith("attachment")
-        assert f"submission-{submission_with_evidence.id}-evidence-{evidence.id}.pdf" in disposition
+        assert f"submission-{submission_with_evidence.id}-evidence-{evidence.id}.txt" in disposition
         assert "no-store" in response.headers["Cache-Control"]
 
     def test_anonymous_and_admin_cannot_download(self, client, admin, submission_with_evidence):
         url = evidence_url(submission_with_evidence.id, submission_with_evidence.evidence[0].id)
         response = client.get(url, follow_redirects=False)
         assert response.status_code == 302
-        assert b"%PDF" not in response.data
+        assert b"PLAIN-TEXT-EVIDENCE" not in response.data
         login(client, ADMIN_USERNAME, ADMIN_PASSWORD)
         response = client.get(url)
         assert response.status_code == 403
-        assert b"%PDF" not in response.data
+        assert b"PLAIN-TEXT-EVIDENCE" not in response.data
 
     def test_disabled_journalist_cannot_download(self, journalist_client, journalist,
                                                  submission_with_evidence):

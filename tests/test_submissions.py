@@ -173,12 +173,12 @@ class TestLegacyRoutes:
 # ---------------------------------------------------------------------------
 class TestEvidence:
     def test_valid_file_is_stored_privately(self, app, client):
-        response = submit(client, evidence=(io.BytesIO(b"%PDF-1.4 test"), "John Smith report.pdf"))
+        response = submit(client, evidence=(io.BytesIO(b"plain evidence"), "John Smith report.txt"))
         assert response.status_code == 200
         evidence = db.session.query(Evidence).one()
 
         stored = Path(app.config["EVIDENCE_DIR"]) / evidence.stored_name
-        assert stored.read_bytes() == b"%PDF-1.4 test"
+        assert stored.read_bytes() == b"plain evidence"
         assert stored.stat().st_mode & 0o077 == 0
         # The identifying original filename is not kept anywhere.
         assert "smith" not in evidence.stored_name.lower()
