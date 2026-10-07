@@ -42,10 +42,10 @@
     <table class="table">
       <thead><tr><th>Ref.</th><th>Title</th><th>Received (UTC)</th></tr></thead>
       <tbody>
-      {% for s in new_submissions %}
+      {% for s, title in new_submissions %}
         <tr>
           <td class="nowrap">#{{ s.id }}</td>
-          <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{{ s.title }}</a></td>
+          <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="field-error">integrity check failed</span>{% endif %}</a></td>
           <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
         </tr>
       {% endfor %}

@@ -146,6 +146,15 @@ class BaseConfig:
     # Anything larger is refused with 413 before the body is read.
     MAX_CONTENT_LENGTH = EVIDENCE_MAX_BYTES + 1024 * 1024
 
+    # --- Phase 5: encryption and integrity keys ---------------------------
+    # Two independent 256-bit keys (base64url), read from the environment only
+    # -- never hard-coded, never stored in the database.  The app refuses to
+    # start if either is missing or invalid (see submissions.register_submissions).
+    PHASE5_ENCRYPTION_KEY = os.environ.get("PHASE5_ENCRYPTION_KEY")
+    PHASE5_HMAC_KEY = os.environ.get("PHASE5_HMAC_KEY")
+    # How far in the future a protected timestamp may be (clock drift).
+    PHASE5_MAX_CLOCK_SKEW_SECONDS = _env_int("PHASE5_MAX_CLOCK_SKEW_SECONDS", 300)
+
     TESTING = False
     DEBUG = False
 
@@ -163,6 +172,9 @@ class TestingConfig(BaseConfig):
     # Fast hashing keeps the suite quick; production keeps the strong default.
     PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000"
     PHASE2_IDLE_TIMEOUT_MINUTES = 15
+    # Fresh random keys for each test run -- no key material in the source.
+    PHASE5_ENCRYPTION_KEY = secrets.token_urlsafe(32)
+    PHASE5_HMAC_KEY = secrets.token_urlsafe(32)
 
 
 class ProductionConfig(BaseConfig):

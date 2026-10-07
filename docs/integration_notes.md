@@ -1,10 +1,11 @@
-# Integration Notes — Phase 1 + Phase 2 + Phase 3 + Phase 4
+# Integration Notes — Phases 1–5
 
 Phase 1 (anonymous submission portal), Phase 2 (authentication &
 authorization), Phase 3 (evidence metadata scrubbing — see
-[`phase3.md`](phase3.md)) and Phase 4 (journalist workflow — see
-[`phase4.md`](phase4.md)) are integrated into **one Flask application** backed
-by **one database**. This document describes the final architecture, what changed
+[`phase3.md`](phase3.md)), Phase 4 (journalist workflow — see
+[`phase4.md`](phase4.md)) and Phase 5 (server-side encryption and integrity —
+see [`phase5.md`](phase5.md)) are integrated into **one Flask application**
+backed by **one database**. This document describes the final architecture, what changed
 during the integration, and how to run the result.
 
 ---
@@ -32,6 +33,7 @@ flask --app app set-status alice AUTHORIZED
 flask --app app reset-password --username admin   # prompts twice, no echo
 flask --app app list-users
 flask --app app scrub-evidence [--dry-run]        # clean evidence stored before Phase 3
+flask --app app protect-legacy-data [--dry-run]   # encrypt data stored before Phase 5
 python database/init_db.py             # same as `flask --app app init-db`
 python database/seed_db.py             # adds one demo submission, prints its token
 pytest                                 # full test suite
@@ -71,6 +73,7 @@ app.py                         the single entry point  -> phase2.create_app()
 │   ├── models.py              Submission, Evidence (on phase2's `db`)
 │   ├── services.py            tokens, validation, evidence storage, workflow
 │   ├── scrubber.py            Phase 3: metadata removal (Pillow) before storage
+│   ├── crypto.py              Phase 5: AES-256-GCM + HMAC-SHA-256 + timestamp
 │   ├── cli.py                 scrub-evidence (clean pre-Phase-3 evidence)
 │   ├── forms.py               WTForms (validation + CSRF)
 │   ├── routes.py              "source" blueprint: /submit, /status, /login
@@ -102,8 +105,8 @@ with `PHASE2_DATABASE_URI`). Phase 1's separate `database/app.db` and its raw
 |---|---|---|
 | `phase2_users` | Phase 2 | admin and journalist accounts (hashed passwords) |
 | `phase2_audit_log` | Phase 2 | append-only security and workflow events |
-| `submissions` | submissions | anonymous reports |
-| `submission_evidence` | submissions | evidence file metadata |
+| `submissions` | submissions | anonymous reports — title and body stored encrypted (Phase 5) |
+| `submission_evidence` | submissions | evidence file metadata — the files hold encrypted packages (Phase 5) |
 
 Phase 1's plaintext `users` table no longer exists: `phase2_users` is the only
 account table.
@@ -209,6 +212,9 @@ All settings come from the environment (`.env`, git-ignored); see
 |---|---|---|
 | `PHASE2_EVIDENCE_DIR` | `instance/evidence` | private evidence storage |
 | `PHASE2_EVIDENCE_MAX_MB` | `10` | per-file limit; the request limit is this + 1 MB |
+| `PHASE5_ENCRYPTION_KEY` | **required** | AES-256 key, base64url of 32 random bytes |
+| `PHASE5_HMAC_KEY` | **required** | HMAC-SHA-256 key, a different base64url 32-byte value |
+| `PHASE5_MAX_CLOCK_SKEW_SECONDS` | `300` | how far in the future a protected timestamp may be |
 
 `PHASE2_PORT` defaults to 5001 (macOS reserves 5000 for AirPlay).
 
@@ -216,8 +222,6 @@ All settings come from the environment (`.env`, git-ignored); see
 
 ## 8. Not done yet (later phases)
 
-* **Phase 5 — AES/HMAC cryptography.** Report content and evidence are stored
-  unencrypted at rest.
 * **Phase 6 — WebSocket channel / traffic analysis.** The Flask-SocketIO pins
   are kept in `requirements.txt` but nothing imports them yet. Precise
   `created_at` timestamps and the dev server's access log (which prints client

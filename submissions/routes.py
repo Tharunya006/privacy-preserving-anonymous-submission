@@ -9,8 +9,17 @@ from __future__ import annotations
 
 from flask import Blueprint, redirect, render_template, request, url_for
 
+from phase2.models import record_event
+
 from .forms import StatusLookupForm, SubmissionForm
-from .services import EvidenceError, create_submission, find_by_token, read_evidence
+from .services import (
+    EvidenceError,
+    ProtectionError,
+    create_submission,
+    find_by_token,
+    open_title,
+    read_evidence,
+)
 
 bp = Blueprint("source", __name__, template_folder="templates")
 
@@ -34,9 +43,11 @@ def submit():
             return render_template("submissions/submit.html", form=form), 400
 
         # Rendered directly (not via redirect + flash) so the token never sits
-        # in a URL or in the readable session cookie.
+        # in a URL or in the readable session cookie.  The title shown is the
+        # one just typed, still in memory -- the stored copy is encrypted.
         return render_template(
-            "submissions/receipt.html", token=token, submission=submission
+            "submissions/receipt.html", token=token, submission=submission,
+            title=form.title.data.strip(),
         )
 
     status_code = 400 if request.method == "POST" else 200
@@ -58,9 +69,17 @@ def status():
                 ),
                 404,
             )
+        try:
+            title = open_title(submission)  # HMAC + timestamp verified, then decrypted
+        except ProtectionError as exc:
+            # Integrity failure: show the status, never unverified data.  Audited
+            # without any source identifier (no IP, no actor).
+            record_event("submission.integrity_failed", target=submission.reference,
+                         detail=f"source status lookup: {getattr(exc, 'reason', 'error')}")
+            title = None
         return render_template(
             "submissions/status.html", form=StatusLookupForm(formdata=None),
-            submission=submission,
+            submission=submission, title=title,
         )
 
     status_code = 400 if request.method == "POST" else 200

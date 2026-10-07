@@ -8,9 +8,17 @@ This is also where anonymous submissions are read (Phase 4): the inbox, the
 report view, the Submitted -> Under review -> Closed workflow and evidence
 downloads.  Opening a report, changing its status and downloading evidence are
 all written to the audit log -- without report content, tokens or file data.
+
+Phase 5 read path, for every view below:
+authenticate (session) -> authorize (@journalist_required, re-checked each
+request) -> fetch the protected row/file -> verify HMAC-SHA-256 -> validate the
+protected timestamp -> decrypt AES-256-GCM -> display / download.  Anything that
+fails verification is never shown; the failure is audited instead.
 """
 
 from __future__ import annotations
+
+import io
 
 from flask import (
     Blueprint,
@@ -20,22 +28,24 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_from_directory,
+    send_file,
     url_for,
 )
 
 from submissions.forms import SubmissionStatusForm
 from submissions.models import Evidence, SubmissionStatus
 from submissions.services import (
+    ProtectionError,
     StatusTransitionError,
-    evidence_dir,
-    evidence_path,
     get_submission,
     latest_submissions,
     next_statuses,
+    open_report,
     paginate_submissions,
+    read_evidence_file,
     status_history,
     submission_counts,
+    try_open_title,
     update_status,
 )
 
@@ -65,6 +75,32 @@ def _get_submission_or_404(submission_id: int):
     return submission
 
 
+def _with_titles(submissions):
+    """(submission, verified title or None) pairs for list views."""
+    return [(s, try_open_title(s)) for s in submissions]
+
+
+def _integrity_failure(action: str, target: str, exc: ProtectionError,
+                       detail_prefix: str = ""):
+    record_event(
+        action,
+        actor=g.current_user,
+        target=target,
+        detail=f"{detail_prefix}{getattr(exc, 'reason', 'error')}",
+        ip_address=_client_ip(),
+    )
+    return (
+        render_template(
+            "phase2/error.html",
+            code=409,
+            message="This data failed its integrity check (HMAC-SHA-256 / timestamp) "
+                    "and was not decrypted or shown. The event has been logged.",
+            user=g.current_user,
+        ),
+        409,
+    )
+
+
 @bp.route("/")
 @bp.route("/dashboard")
 @journalist_required
@@ -74,7 +110,7 @@ def dashboard():
         user=g.current_user,
         logout_form=EmptyForm(),
         submission_counts=submission_counts(),
-        new_submissions=latest_submissions(SubmissionStatus.SUBMITTED.value),
+        new_submissions=_with_titles(latest_submissions(SubmissionStatus.SUBMITTED.value)),
     )
 
 
@@ -101,7 +137,7 @@ def inbox():
     return render_template(
         "phase2/journalist_inbox.html",
         user=g.current_user,
-        submissions=pagination.items,
+        submissions=_with_titles(pagination.items),
         pagination=pagination,
         status_filter=status_filter,
         statuses=[SubmissionStatus(s) for s in statuses],
@@ -113,6 +149,10 @@ def inbox():
 @journalist_required
 def submission_detail(submission_id: int):
     submission = _get_submission_or_404(submission_id)
+    try:
+        report = open_report(submission)
+    except ProtectionError as exc:
+        return _integrity_failure("submission.integrity_failed", submission.reference, exc)
     record_event(
         "submission.viewed",
         actor=g.current_user,
@@ -123,6 +163,7 @@ def submission_detail(submission_id: int):
         "phase2/journalist_submission.html",
         user=g.current_user,
         submission=submission,
+        report=report,
         status_form=SubmissionStatusForm(),
         next_statuses=next_statuses(submission),
         history=status_history(submission),
@@ -157,9 +198,13 @@ def download_evidence(submission_id: int, evidence_id: int):
     evidence = db.session.get(Evidence, evidence_id)
     if evidence is None or evidence.submission_id != submission_id:
         abort(404)
-    path = evidence_path(evidence)
-    if path is None or not path.is_file():
+    try:
+        plaintext = read_evidence_file(evidence)  # verify, then decrypt
+    except FileNotFoundError:
         abort(404)
+    except ProtectionError as exc:
+        return _integrity_failure("evidence.integrity_failed", evidence.submission.reference,
+                                  exc, detail_prefix=f"evidence={evidence.id}: ")
 
     record_event(
         "evidence.downloaded",
@@ -168,10 +213,9 @@ def download_evidence(submission_id: int, evidence_id: int):
         detail=f"evidence={evidence.id}",
         ip_address=_client_ip(),
     )
-    # send_from_directory refuses any name that escapes the evidence directory.
-    return send_from_directory(
-        evidence_dir(),
-        evidence.stored_name,
+    # Decrypted in memory and streamed; the plaintext is never written to disk.
+    return send_file(
+        io.BytesIO(plaintext),
         mimetype="application/octet-stream",
         as_attachment=True,
         download_name=evidence.download_name,

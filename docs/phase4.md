@@ -159,8 +159,8 @@ An existing `instance/phase2.db` needs no migration.
 
 ## 7. Limitations (later phases)
 
-* **No encryption at rest** (Phase 5): report text and evidence are stored in
-  plaintext in SQLite and on disk.
+* Encryption at rest and integrity checks are added by Phase 5
+  ([`phase5.md`](phase5.md)); every journalist view verifies, then decrypts.
 * **No real-time updates / traffic-analysis defences** (Phase 6).
 * A closed report cannot be reopened; there is no per-journalist assignment —
   every authorized journalist sees every report.

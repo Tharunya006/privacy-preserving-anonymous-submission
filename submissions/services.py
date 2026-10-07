@@ -3,6 +3,10 @@
 Shared by the public source routes, the journalist views and the CLI helpers so
 the rules (validation, token handling, evidence storage, auditing) live in one
 place and are testable without an HTTP request.
+
+Phase 5: everything sensitive is sealed here before it is stored (title, body,
+evidence) and only opened here, through ``submissions.crypto.open_package``,
+which verifies HMAC-SHA-256 and the timestamp before it decrypts.
 """
 
 from __future__ import annotations
@@ -11,18 +15,35 @@ import hashlib
 import os
 import re
 import secrets
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
+from werkzeug.security import safe_join
 from werkzeug.utils import secure_filename
 
 from phase2.extensions import db
 from phase2.models import AuditLog, User, record_event, utcnow
 
 from .models import STATUS_LABELS, Evidence, Submission, SubmissionStatus
+from .crypto import (
+    IntegrityCheckError,
+    Keys,
+    ProtectionError,
+    open_package,
+    open_text,
+    seal,
+    seal_text,
+)
 from .scrubber import SCRUBBABLE_EXTENSIONS, ScrubError, scrub_evidence
+
+# What each protected value is; bound into its HMAC and AES-GCM associated data.
+PURPOSE_TITLE = "submission.title"
+PURPOSE_CONTENT = "submission.content"
+PURPOSE_EVIDENCE = "evidence.file"
 
 TITLE_MAX_LENGTH = 200
 CONTENT_MAX_LENGTH = 20_000
@@ -36,7 +57,7 @@ TOKEN_BYTES = 24
 ALLOWED_EVIDENCE_EXTENSIONS = SCRUBBABLE_EXTENSIONS
 
 
-# The only shape a stored evidence name can take (see _write_evidence_file).
+# The only shape a stored evidence name can take (see write_evidence_file).
 STORED_NAME_RE = re.compile(r"^[0-9a-f]{32}\.[a-z0-9]{1,10}$")
 
 INBOX_PAGE_SIZE = 25
@@ -113,13 +134,81 @@ def read_evidence(upload: FileStorage | None) -> tuple[str, bytes] | None:
     return extension, data
 
 
-def _write_evidence_file(extension: str, data: bytes) -> Path:
+# ---------------------------------------------------------------------------
+# Phase 5 protection helpers
+# ---------------------------------------------------------------------------
+def protection_keys() -> Keys:
+    return current_app.extensions["phase5_keys"]
+
+
+def _max_skew() -> int:
+    return current_app.config.get("PHASE5_MAX_CLOCK_SKEW_SECONDS", 300)
+
+
+def _evidence_binding(stored_name: str, extension: str) -> str:
+    return f"{stored_name}|{extension}"
+
+
+@dataclass(frozen=True)
+class OpenedReport:
+    """Decrypted, verified report text -- only ever held in memory."""
+
+    title: str
+    content: str
+
+
+def _open_field(submission: Submission, value: str | None, purpose: str) -> str:
+    return open_text(
+        protection_keys(), value, purpose=purpose, binding=submission.token_hash,
+        expected_timestamp=submission.created_at, max_skew_seconds=_max_skew(),
+    )
+
+
+def open_title(submission: Submission) -> str:
+    """Verify, then decrypt the title.  Raises ``IntegrityCheckError``."""
+    return _open_field(submission, submission.title_sealed, PURPOSE_TITLE)
+
+
+def open_report(submission: Submission) -> OpenedReport:
+    """Verify, then decrypt title and body.  Raises ``IntegrityCheckError``."""
+    return OpenedReport(
+        title=_open_field(submission, submission.title_sealed, PURPOSE_TITLE),
+        content=_open_field(submission, submission.content_sealed, PURPOSE_CONTENT),
+    )
+
+
+def try_open_title(submission: Submission) -> str | None:
+    """For list views: ``None`` instead of an exception when a row fails."""
+    try:
+        return open_title(submission)
+    except ProtectionError:
+        return None
+
+
+def seal_submission_fields(submission: Submission, title: str, content: str) -> None:
+    """Protect title and body for this row (token hash + creation time bound in)."""
+    keys = protection_keys()
+    common = {"binding": submission.token_hash, "timestamp": submission.created_at}
+    submission.title_sealed = seal_text(keys, title, purpose=PURPOSE_TITLE, **common)
+    submission.content_sealed = seal_text(keys, content, purpose=PURPOSE_CONTENT, **common)
+
+
+# ---------------------------------------------------------------------------
+# Evidence storage (files hold protected packages, never plaintext)
+# ---------------------------------------------------------------------------
+def write_evidence_file(extension: str, data: bytes, created_at: datetime) -> Path:
+    """Seal already-scrubbed ``data`` and write it under a new random name."""
     directory = evidence_dir()
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = directory / f"{secrets.token_hex(16)}.{extension}"
+    name = f"{secrets.token_hex(16)}.{extension}"
+    package = seal(
+        protection_keys(), data, purpose=PURPOSE_EVIDENCE,
+        binding=_evidence_binding(name, extension), timestamp=created_at,
+    )
+    path = directory / name
     # "x" refuses to overwrite: a random-name collision fails loudly instead.
     with path.open("xb") as handle:
-        handle.write(data)
+        handle.write(package)
     os.chmod(path, 0o600)
     return path
 
@@ -129,7 +218,24 @@ def evidence_path(evidence: Evidence) -> Path | None:
     this application generated (a tampered row can never point elsewhere)."""
     if not STORED_NAME_RE.fullmatch(evidence.stored_name or ""):
         return None
-    return evidence_dir() / evidence.stored_name
+    joined = safe_join(str(evidence_dir()), evidence.stored_name)
+    return Path(joined) if joined else None
+
+
+def read_evidence_file(evidence: Evidence) -> bytes:
+    """Verify, then decrypt one evidence file.
+
+    Raises ``FileNotFoundError`` if it is missing and ``IntegrityCheckError``
+    if it fails verification (including legacy, unprotected files).
+    """
+    path = evidence_path(evidence)
+    if path is None or not path.is_file():
+        raise FileNotFoundError("Evidence file is missing.")
+    return open_package(
+        protection_keys(), path.read_bytes(), purpose=PURPOSE_EVIDENCE,
+        binding=_evidence_binding(evidence.stored_name, evidence.extension),
+        expected_timestamp=evidence.created_at, max_skew_seconds=_max_skew(),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +262,10 @@ def create_submission(
     disk write -- every caller goes through this, so unscrubbed evidence cannot
     be stored.  If it cannot be cleaned, ``EvidenceError`` is raised and nothing
     at all is saved.
+
+    Phase 5: title, body and (scrubbed) evidence are then sealed -- AES-256-GCM
+    plus HMAC-SHA-256 -- with the record's creation time as the protected
+    timestamp.  Plaintext never reaches the database or the disk.
     """
     title = _clean_text(title, "Title", TITLE_MAX_LENGTH)
     content = _clean_text(content, "Report", CONTENT_MAX_LENGTH)
@@ -167,9 +277,13 @@ def create_submission(
         except ScrubError as exc:
             raise EvidenceError(str(exc)) from exc
 
+    created_at = utcnow()
     for _ in range(3):
         token = generate_token()
-        submission = Submission(token_hash=hash_token(token), title=title, content=content)
+        submission = Submission(
+            token_hash=hash_token(token), created_at=created_at, updated_at=created_at
+        )
+        seal_submission_fields(submission, title, content)
         db.session.add(submission)
         try:
             db.session.flush()
@@ -183,9 +297,10 @@ def create_submission(
     try:
         if evidence is not None:
             extension, data = evidence  # already scrubbed above
-            written = _write_evidence_file(extension, data)
+            written = write_evidence_file(extension, data, created_at)
             submission.evidence.append(
-                Evidence(stored_name=written.name, extension=extension, size_bytes=len(data))
+                Evidence(stored_name=written.name, extension=extension,
+                         size_bytes=len(data), created_at=created_at)
             )
         record_event(
             "submission.created",

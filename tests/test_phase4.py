@@ -190,8 +190,8 @@ class TestSubmissionDetail:
             environ_base={"REMOTE_ADDR": "203.0.113.50"},
             headers={"User-Agent": "SourceBrowser/9.9", "X-Forwarded-For": "198.51.100.23"},
         )
-        sub = db.session.query(Submission).filter_by(title="ident").one()
-        columns = set(Submission.__table__.columns.keys())
+        sub = db.session.query(Submission).one()
+        columns = {column.name for column in Submission.__table__.columns}
         assert columns == {"id", "token_hash", "title", "content", "status", "created_at", "updated_at"}
 
         page = journalist_client.get(f"/journalist/submissions/{sub.id}").data

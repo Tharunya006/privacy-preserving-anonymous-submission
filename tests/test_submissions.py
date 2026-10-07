@@ -17,7 +17,13 @@ from phase2 import create_app
 from phase2.extensions import db
 from phase2.models import AuditLog
 from submissions.models import Evidence, Submission, SubmissionStatus
-from submissions.services import create_submission, find_by_token, hash_token
+from submissions.services import (
+    create_submission,
+    find_by_token,
+    hash_token,
+    open_title,
+    read_evidence_file,
+)
 from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, JOURNALIST_PASSWORD, login
 
 TOKEN_RE = re.compile(rb"<code>([A-Za-z0-9_-]{32})</code>")
@@ -83,7 +89,8 @@ class TestTokens:
     def test_duplicate_titles_do_not_crash(self, client):
         for _ in range(3):
             assert submit(client, title="Duplicate").status_code == 200
-        assert db.session.query(Submission).filter_by(title="Duplicate").count() == 3
+        titles = [open_title(s) for s in db.session.query(Submission)]
+        assert titles == ["Duplicate"] * 3
 
     def test_only_the_token_hash_is_stored(self, app):
         submission, token = create_submission("Title", "Body")
@@ -178,7 +185,8 @@ class TestEvidence:
         evidence = db.session.query(Evidence).one()
 
         stored = Path(app.config["EVIDENCE_DIR"]) / evidence.stored_name
-        assert stored.read_bytes() == b"plain evidence"
+        assert b"plain evidence" not in stored.read_bytes()  # encrypted at rest
+        assert read_evidence_file(evidence) == b"plain evidence"
         assert stored.stat().st_mode & 0o077 == 0
         # The identifying original filename is not kept anywhere.
         assert "smith" not in evidence.stored_name.lower()
@@ -247,7 +255,7 @@ class TestEvidence:
         submit(client, evidence=(io.BytesIO(b"a"), "a.txt"))
         submit(client, title="other")
         evidence = db.session.query(Evidence).one()
-        other = db.session.query(Submission).filter_by(title="other").one()
+        other = next(s for s in db.session.query(Submission) if open_title(s) == "other")
         login(client, journalist.username, JOURNALIST_PASSWORD)
         url = f"/journalist/submissions/{other.id}/evidence/{evidence.id}"
         assert client.get(url).status_code == 404

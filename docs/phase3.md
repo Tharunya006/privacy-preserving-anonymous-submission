@@ -145,6 +145,7 @@ Run: `pytest tests/test_phase3.py`, or `pytest` for the whole suite.
 * JPEG/WebP evidence is re-encoded (quality 95), so it is not byte-identical to
   the original; animated images keep only the first frame.
 * PDF and office documents are not accepted at all.
-* Evidence is not encrypted at rest — that is Phase 5.
+* Encryption at rest is added by Phase 5 ([`phase5.md`](phase5.md)): the
+  scrubbed bytes are encrypted before they are written.
 * Overwriting/deleting files on disk does not securely erase the underlying
   storage blocks.

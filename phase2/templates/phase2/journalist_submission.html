@@ -2,19 +2,20 @@
 {% block title %}Submission #{{ submission.id }}{% endblock %}
 
 {% block content %}
-<h1>{{ submission.title }}</h1>
+<h1>{{ report.title }}</h1>
 <p>
   <span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span>
   <span class="muted small">Submission #{{ submission.id }}</span>
 </p>
 <p class="muted small">
   The source is anonymous: no name, account, IP address or session is stored with
-  this report.
+  this report. The report and evidence are stored encrypted (AES-256-GCM) and
+  passed their HMAC-SHA-256 integrity and timestamp checks before being shown.
 </p>
 
 <section class="panel">
   <h2>Report</h2>
-  <div class="report-body">{{ submission.content }}</div>
+  <div class="report-body">{{ report.content }}</div>
 </section>
 
 <section class="panel">

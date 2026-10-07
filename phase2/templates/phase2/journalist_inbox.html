@@ -24,10 +24,10 @@
       <tr><th>Ref.</th><th>Title</th><th>Status</th><th>Evidence</th><th>Received (UTC)</th><th>Updated (UTC)</th></tr>
     </thead>
     <tbody>
-    {% for s in submissions %}
+    {% for s, title in submissions %}
       <tr>
         <td class="nowrap">#{{ s.id }}</td>
-        <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{{ s.title }}</a></td>
+        <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="field-error">integrity check failed</span>{% endif %}</a></td>
         <td><span class="badge badge-sub-{{ s.status|lower }}">{{ s.status_label }}</span></td>
         <td>{{ s.evidence|length }}</td>
         <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>

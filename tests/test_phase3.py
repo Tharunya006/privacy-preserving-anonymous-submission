@@ -29,7 +29,7 @@ from submissions.scrubber import (
     scrub_evidence,
     scrub_image,
 )
-from submissions.services import create_submission, evidence_path
+from submissions.services import create_submission, evidence_path, read_evidence_file
 from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, JOURNALIST_PASSWORD, login
 
 SECRET = "JaneSource-Camera-SN-998877"
@@ -279,12 +279,13 @@ class TestSubmissionPipeline:
 
         files = stored_files(app)
         assert len(files) == 1, files  # no temp / original copy left behind
-        data = files[0].read_bytes()
+        on_disk = files[0].read_bytes()
+        assert on_disk.startswith(b"P5")  # Phase 5: stored encrypted
+        evidence = db.session.query(Evidence).one()
+        data = read_evidence_file(evidence)  # verified + decrypted
         assert data != raw
         assert_no_identifying_bytes(data)
         assert metadata_of(data)["gps"] == {}
-
-        evidence = db.session.query(Evidence).one()
         assert evidence.size_bytes == len(data)
         assert evidence.stored_name == files[0].name
         assert "jane" not in evidence.stored_name.lower()
@@ -292,8 +293,9 @@ class TestSubmissionPipeline:
 
     def test_service_scrubs_even_when_called_directly(self, app):
         submission, _ = create_submission("direct", "body", ("jpg", jpeg_with_metadata()))
-        data = evidence_path(submission.evidence[0]).read_bytes()
+        data = read_evidence_file(submission.evidence[0])
         assert_no_identifying_bytes(data)
+        assert metadata_of(data)["gps"] == {}
 
     @pytest.mark.parametrize(
         "upload,message",
@@ -334,7 +336,7 @@ class TestSubmissionPipeline:
 
         response = submit(client, (io.BytesIO(buffer.getvalue()), "big.png"))
         assert response.status_code == 200
-        assert_no_identifying_bytes(stored_files(app)[0].read_bytes())
+        assert_no_identifying_bytes(read_evidence_file(db.session.query(Evidence).one()))
 
     def test_receipt_and_status_still_work(self, client):
         response = submit(client, (io.BytesIO(jpeg_with_metadata()), "p.jpg"))
@@ -361,7 +363,8 @@ class TestJournalistAccessToCleanEvidence:
         url = f"/journalist/submissions/{evidence.submission_id}/evidence/{evidence.id}"
         response = client.get(url)
         assert response.status_code == 200
-        assert response.data == stored_files(app)[0].read_bytes()
+        assert response.data == read_evidence_file(evidence)
+        assert response.data != stored_files(app)[0].read_bytes()  # disk holds ciphertext
         assert response.headers["Content-Disposition"].startswith("attachment")
         assert_no_identifying_bytes(response.data)
         assert metadata_of(response.data)["gps"] == {}
@@ -426,9 +429,11 @@ class TestScrubEvidenceCommand:
         db.session.expire_all()
         cleaned = db.session.get(Evidence, dirty.id)
         assert not old_path.exists()  # the original is deleted
-        data = evidence_path(cleaned).read_bytes()
+        data = read_evidence_file(cleaned)
         assert_no_identifying_bytes(data)
+        assert metadata_of(data)["gps"] == {}
         assert cleaned.size_bytes == len(data)
+        assert evidence_path(cleaned).read_bytes().startswith(b"P5")  # now encrypted too
         assert evidence_path(db.session.get(Evidence, pdf.id)).exists()  # never auto-deleted
         assert db.session.query(AuditLog).filter_by(action="evidence.scrubbed").count() == 1
 
