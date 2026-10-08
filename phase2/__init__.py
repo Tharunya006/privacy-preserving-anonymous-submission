@@ -22,7 +22,7 @@ from .config import (
     normalise_database_uri,
     resolve_config,
 )
-from .extensions import csrf, db
+from .extensions import csrf, db, socketio
 
 __version__ = "2.0.0"
 
@@ -63,6 +63,9 @@ def create_app(config_name: str | None = None, **overrides) -> Flask:
 
     db.init_app(app)
     csrf.init_app(app)
+    socketio.init_app(app)
+
+    from . import socket_events
 
     from submissions import register_submissions
 
