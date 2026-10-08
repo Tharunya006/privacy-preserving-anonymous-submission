@@ -113,23 +113,70 @@
   });
 })();
 
-// Phase 6 - real-time journalist notifications.
+// Phase 6 - real-time notifications for authorized journalists.
+// The server only accepts the connection from a signed-in, AUTHORIZED
+// journalist session and re-checks the account before every event.  Events
+// carry a fixed message, a reference number and a status: never report
+// content, tokens or evidence.  The client library is served from this origin.
 (function () {
   "use strict";
 
-  if (typeof io === "undefined") return;
+  var body = document.body;
+  if (!body || body.getAttribute("data-realtime") !== "on" || typeof window.io !== "function") return;
 
-  var socket = io();
+  var stack = document.querySelector("[data-toast-stack]");
+  var statusEl = document.querySelector("[data-live-status]");
+  var inboxUrl = body.getAttribute("data-inbox-url") || "/journalist/inbox";
+
+  function setStatus(text, state) {
+    if (!statusEl) return;
+    statusEl.hidden = false;
+    statusEl.textContent = text;
+    statusEl.setAttribute("data-state", state);
+  }
+
+  function toast(text, linkText, href) {
+    if (!stack) return;
+    var item = document.createElement("div");
+    item.className = "toast";
+    item.setAttribute("role", "status");
+    var p = document.createElement("p");
+    p.textContent = text;
+    item.appendChild(p);
+    var actions = document.createElement("div");
+    actions.className = "toast-actions";
+    if (linkText && href) {
+      var a = document.createElement("a");
+      a.href = href;
+      a.textContent = linkText;
+      actions.appendChild(a);
+    }
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "toast-close";
+    close.textContent = "Dismiss";
+    close.addEventListener("click", function () { item.remove(); });
+    actions.appendChild(close);
+    item.appendChild(actions);
+    stack.appendChild(item);
+    while (stack.children.length > 4) stack.removeChild(stack.firstChild);
+  }
+
+  var socket = window.io({ transports: ["websocket", "polling"] });
+
+  socket.on("connect", function () { setStatus("Live updates on", "on"); });
+  socket.on("disconnect", function (reason) {
+    setStatus(reason === "io server disconnect" ? "Live updates stopped (sign in again)" : "Live updates reconnecting", "off");
+  });
+  socket.on("connect_error", function () { setStatus("Live updates unavailable", "off"); });
 
   socket.on("new_submission", function (data) {
-    var message = document.createElement("div");
-    message.className = "flash success";
-    message.setAttribute("role", "status");
-    message.textContent = data.message || "A new submission has been received.";
+    toast((data && data.message) || "A new anonymous submission has been received.", "Open inbox", inboxUrl);
+  });
 
-    var main = document.querySelector("main");
-    if (main) {
-      main.insertBefore(message, main.firstChild);
-    }
+  socket.on("submission_status_changed", function (data) {
+    if (!data || typeof data.id !== "number") return;
+    toast(String(data.message || ("Submission #" + data.id + " was updated.")),
+          "View #" + data.id, inboxUrl.replace(/\/inbox$/, "/submissions/" + data.id));
   });
 })();

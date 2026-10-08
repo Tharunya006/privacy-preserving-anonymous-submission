@@ -14,7 +14,7 @@ One Flask application with one database:
 * **Administrators** create, authorize and disable journalist accounts and
   review the audit log.
 
-**Phases 1–5 are integrated** into one application with one database:
+**All six phases are integrated** into one application with one database:
 
 | Phase | What it provides |
 |---|---|
@@ -23,6 +23,7 @@ One Flask application with one database:
 | 3 | Evidence metadata scrubbing (EXIF/GPS/XMP/ICC removed with Pillow before storage) |
 | 4 | Journalist inbox, report view, `Submitted → Under review → Closed` workflow, evidence download |
 | 5 | Server-side encryption at rest (AES-256-GCM), HMAC-SHA-256 integrity, timestamp/replay protection |
+| 6 | Real-time WebSocket notifications for journalists (Flask-SocketIO); Wireshark/PyShark traffic analysis (protected vs unprotected, packet size, timing, overhead); crypto/scrubbing timing benchmarks |
 
 Phase 5 is **application-level (server-side) encryption**, not end-to-end: the
 server holds the keys so authorized journalists can read reports. See
@@ -64,6 +65,19 @@ flask --app app protect-legacy-data    # encrypt pre-Phase-5 reports/evidence (u
 flask --app app scrub-evidence         # clean older evidence (use --dry-run first)
 ```
 
+### Phase 6 analysis (optional)
+
+```bash
+pip install -r analysis/requirements.txt       # PyShark etc.; also install Wireshark (tshark)
+python -m analysis.benchmark                   # crypto + scrubbing timings -> analysis/results/benchmark.md
+python -m analysis.traffic_capture             # HTTP vs HTTPS run of the same workflow -> pcaps
+python -m analysis.traffic_analysis            # PyShark report -> analysis/results/traffic_report.md
+PHASE6_TLS=adhoc python app.py                 # run the app over HTTPS/WSS (demo certificate)
+```
+
+The application never claims network anonymity: serve it over HTTPS, and see
+[`docs/phase6.md`](docs/phase6.md) for what is and is not protected on the wire.
+
 ### Tests
 
 ```bash
@@ -83,3 +97,5 @@ pytest
   limitations
 * [`docs/phase4.md`](docs/phase4.md) — journalist workflow, status rules,
   evidence access and Phase 4 security
+* [`docs/phase6.md`](docs/phase6.md) — WebSocket notifications, traffic analysis
+  (Wireshark/PyShark), timing results, image colour-mode behaviour, limitations

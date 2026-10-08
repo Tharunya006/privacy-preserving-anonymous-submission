@@ -128,10 +128,12 @@ def _pixels_only(image: Image.Image, fmt: str) -> Image.Image:
     clean = Image.frombytes(image.mode, image.size, image.tobytes())
     if image.mode == "P":
         clean.putpalette(image.getpalette())
-        # A palette transparency index is rendering data, not metadata.
-        transparency = image.info.get("transparency")
-        if isinstance(transparency, (int, bytes)):
-            clean.info["transparency"] = transparency
+    # A transparency key is rendering data, not metadata: a palette index (P),
+    # a grey level (L) or an RGB colour (PNG tRNS colour-key transparency).
+    # Without it, colour-key transparent PNGs would come back opaque.
+    transparency = image.info.get("transparency")
+    if image.mode in ("P", "L", "RGB") and isinstance(transparency, (int, bytes, tuple)):
+        clean.info["transparency"] = transparency
     return clean
 
 

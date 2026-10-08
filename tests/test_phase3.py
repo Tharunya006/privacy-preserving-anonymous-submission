@@ -174,6 +174,22 @@ class TestScrubImage:
         with Image.open(io.BytesIO(buffer.getvalue())) as a, Image.open(io.BytesIO(clean)) as b:
             assert a.convert("RGBA").tobytes() == b.convert("RGBA").tobytes()
 
+    @pytest.mark.parametrize("mode,key,fill,odd", [
+        ("RGB", (10, 200, 30), (10, 200, 30), (1, 2, 3)),
+        ("L", 0, 0, 99),
+    ])
+    def test_colour_key_transparency_is_preserved(self, mode, key, fill, odd):
+        """PNG tRNS colour-key transparency on RGB / greyscale images survives."""
+        image = Image.new(mode, (4, 4), fill)
+        image.putpixel((0, 0), odd)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG", transparency=key)
+        _, clean = scrub_image(buffer.getvalue())
+        with Image.open(io.BytesIO(clean)) as out:
+            assert out.mode == mode
+            alpha = [px[3] for px in out.convert("RGBA").getdata()]
+        assert alpha.count(0) == 15 and alpha.count(255) == 1
+
     def test_cmyk_jpeg_is_supported(self):
         _, clean = scrub_image(jpeg_with_metadata(mode="CMYK"))
         assert_no_identifying_bytes(clean)
@@ -200,7 +216,10 @@ class TestScrubImage:
             b"definitely not an image",
             b"\x89PNG\r\n\x1a\n" + b"\x00" * 64,           # PNG signature, garbage body
             jpeg_with_metadata()[:200],                      # truncated JPEG
-            b"GIF89a" + os.urandom(64),
+            # A GIF header declaring a small 16x16 canvas, followed by garbage.
+            # (Fixed bytes: random ones occasionally declared a huge canvas and
+            # were refused as "too large" instead, which made the test flaky.)
+            b"GIF89a\x10\x00\x10\x00\x80\x00\x00" + b"\xff\x00" * 24,
             b"%PDF-1.7\n" + b"x" * 100,                      # PDF renamed to .jpg
         ],
     )

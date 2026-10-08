@@ -2,7 +2,7 @@
 
 Phase 5 protects report text and evidence **at rest** with AES-256 encryption,
 HMAC-SHA-256 integrity, and a protected timestamp that detects stale or replayed
-data. It is built into the integrated application (Phases 1–5, one Flask app,
+data. It is built into the integrated application (Phases 1–6, one Flask app,
 one database).
 
 > **What kind of encryption this is.** This is **application-level
@@ -241,6 +241,6 @@ each makes the Phase 5 tests fail.
   tokens limit this to the same session).
 * Decrypted data exists in server memory while a page or download is served.
 * Deleting or replacing a file does not securely erase the old disk blocks.
-* No transport security is added here: run behind HTTPS (and set
-  `PHASE2_COOKIE_SECURE=true`). Phase 6 (WebSockets / traffic analysis / Tor)
-  is not implemented.
+* Encryption at rest does not protect data on the network: run behind HTTPS
+  (and set `PHASE2_COOKIE_SECURE=true`). Phase 6 measures this directly
+  (`docs/phase6.md` §4). Tor/network anonymity is not implemented.

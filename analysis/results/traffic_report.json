@@ -1,0 +1,247 @@
+[
+  {
+    "mode": "http",
+    "pcap": "analysis/results/http_unprotected.pcap",
+    "packets_written": 132,
+    "connections": 13,
+    "client_timings_ms": {
+      "journalist GET /auth/login": 12.58,
+      "journalist POST /auth/login": 89.54,
+      "journalist WebSocket connect": 1.96,
+      "source GET /submit": 3.07,
+      "source POST /submit (with photo)": 14.84,
+      "journalist GET inbox": 4.9,
+      "journalist GET report": 5.83,
+      "journalist GET evidence": 2.69,
+      "journalist POST status": 5.47,
+      "source GET /status": 2.75,
+      "source POST /status": 1.61
+    },
+    "websocket_events_received": [
+      [
+        "new_submission",
+        {
+          "message": "A new anonymous submission has been received."
+        }
+      ],
+      [
+        "submission_status_changed",
+        {
+          "id": 1,
+          "status": "UNDER_REVIEW",
+          "message": "Submission #1 is now Under review."
+        }
+      ]
+    ],
+    "photo_bytes_uploaded": 1945,
+    "storage_scan": {
+      "database": {
+        "report_title": false,
+        "report_body": false,
+        "photo_exif_camera": false,
+        "submission_token": false
+      },
+      "evidence files": {
+        "report_title": false,
+        "report_body": false,
+        "photo_exif_camera": false,
+        "submission_token": false
+      }
+    },
+    "analysis": {
+      "file": "analysis/results/http_unprotected.pcap",
+      "packets": 132,
+      "tcp_streams": 13,
+      "duration_ms": 3153.5,
+      "frame_bytes": {
+        "count": 132,
+        "total": 68494,
+        "min": 54,
+        "median": 60.0,
+        "mean": 518.9,
+        "max": 1514
+      },
+      "tcp_payload_bytes": {
+        "count": 67,
+        "total": 61366,
+        "min": 4,
+        "median": 1185,
+        "mean": 915.9,
+        "max": 1460
+      },
+      "header_overhead_bytes": 7128,
+      "header_overhead_pct": 10.4,
+      "http_requests_visible": [
+        "GET /auth/login",
+        "POST /auth/login",
+        "GET /journalist/dashboard",
+        "GET /socket.io/?transport=websocket&EIO=4&t=1791483799.762603",
+        "GET /submit",
+        "POST /submit",
+        "GET /journalist/inbox",
+        "GET /journalist/submissions/1",
+        "GET /journalist/submissions/1/evidence/1",
+        "POST /journalist/submissions/1/status",
+        "GET /journalist/submissions/1",
+        "GET /status",
+        "POST /status"
+      ],
+      "http_response_times_ms": {
+        "count": 13,
+        "total": 129.60999999999999,
+        "min": 0.39,
+        "median": 2.22,
+        "mean": 10.0,
+        "max": 83.55
+      },
+      "tls": {
+        "handshake_bytes": 0,
+        "app_data_bytes": 0,
+        "other_bytes": 0,
+        "records": 0,
+        "handshake_ms": {
+          "count": 0
+        }
+      },
+      "websocket_messages_visible": [
+        {
+          "direction": "s2c",
+          "text": "0{\"sid\":\"pUvxnw5-v9wMWMjTAAAA\",\"upgrades\":[],\"pingTimeout\":20000,\"pingInterval\":25000,\"maxPayload\":1000000}"
+        },
+        {
+          "direction": "c2s",
+          "text": "40{}"
+        },
+        {
+          "direction": "s2c",
+          "text": "40{\"sid\":\"ahy7UKH89pFPfVQ7AAAB\"}"
+        },
+        {
+          "direction": "s2c",
+          "text": "42[\"new_submission\",{\"message\":\"A new anonymous submission has been received.\"}]"
+        },
+        {
+          "direction": "s2c",
+          "text": "42[\"submission_status_changed\",{\"id\":1,\"status\":\"UNDER_REVIEW\",\"message\":\"Submission #1 is now Under review.\"}]"
+        },
+        {
+          "direction": "c2s",
+          "text": "41"
+        },
+        {
+          "direction": "c2s",
+          "text": "1"
+        }
+      ],
+      "plaintext_exposure": {
+        "report_title": true,
+        "report_body": true,
+        "photo_exif_camera": true,
+        "submission_token": true,
+        "journalist_session_cookie": true,
+        "journalist_password": true
+      }
+    }
+  },
+  {
+    "mode": "https",
+    "pcap": "analysis/results/https_protected.pcap",
+    "packets_written": 194,
+    "connections": 13,
+    "client_timings_ms": {
+      "journalist GET /auth/login": 13.72,
+      "journalist POST /auth/login": 89.78,
+      "journalist WebSocket connect": 2.86,
+      "source GET /submit": 3.94,
+      "source POST /submit (with photo)": 12.52,
+      "journalist GET inbox": 5.89,
+      "journalist GET report": 6.81,
+      "journalist GET evidence": 3.48,
+      "journalist POST status": 7.11,
+      "source GET /status": 3.49,
+      "source POST /status": 2.53
+    },
+    "websocket_events_received": [
+      [
+        "new_submission",
+        {
+          "message": "A new anonymous submission has been received."
+        }
+      ],
+      [
+        "submission_status_changed",
+        {
+          "id": 1,
+          "status": "UNDER_REVIEW",
+          "message": "Submission #1 is now Under review."
+        }
+      ]
+    ],
+    "photo_bytes_uploaded": 1945,
+    "storage_scan": {
+      "database": {
+        "report_title": false,
+        "report_body": false,
+        "photo_exif_camera": false,
+        "submission_token": false
+      },
+      "evidence files": {
+        "report_title": false,
+        "report_body": false,
+        "photo_exif_camera": false,
+        "submission_token": false
+      }
+    },
+    "analysis": {
+      "file": "analysis/results/https_protected.pcap",
+      "packets": 194,
+      "tcp_streams": 13,
+      "duration_ms": 3154.3,
+      "frame_bytes": {
+        "count": 194,
+        "total": 104816,
+        "min": 54,
+        "median": 309.0,
+        "mean": 540.3,
+        "max": 1514
+      },
+      "tcp_payload_bytes": {
+        "count": 129,
+        "total": 94340,
+        "min": 26,
+        "median": 517,
+        "mean": 731.3,
+        "max": 1460
+      },
+      "header_overhead_bytes": 10476,
+      "header_overhead_pct": 10.0,
+      "http_requests_visible": [],
+      "http_response_times_ms": {
+        "count": 0
+      },
+      "tls": {
+        "handshake_bytes": 8372,
+        "app_data_bytes": 85812,
+        "other_bytes": 156,
+        "records": 195,
+        "handshake_ms": {
+          "count": 13,
+          "total": 13.34,
+          "min": 0.67,
+          "median": 0.72,
+          "mean": 1.0,
+          "max": 4.81
+        }
+      },
+      "websocket_messages_visible": [],
+      "plaintext_exposure": {
+        "report_title": false,
+        "report_body": false,
+        "photo_exif_camera": false,
+        "submission_token": false,
+        "journalist_session_cookie": false,
+        "journalist_password": false
+      }
+    }
+  }
+]

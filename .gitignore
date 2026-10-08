@@ -49,3 +49,9 @@ htmlcov/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Phase 6 analysis output that may contain test credentials / raw traffic.
+# The generated reports (benchmark.*, traffic_report.*) are committed.
+analysis/results/*.pcap
+analysis/results/*.pcapng
+analysis/results/capture_meta.json

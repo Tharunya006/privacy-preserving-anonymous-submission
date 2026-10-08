@@ -1,0 +1,7 @@
+# Phase 6 analysis tooling only (not needed to run the application).
+# Install on top of the main requirements:
+#   pip install -r requirements.txt -r analysis/requirements.txt
+# PyShark also needs Wireshark's tshark binary (bundled with Wireshark).
+pyshark==0.6
+requests>=2.32,<3
+websocket-client>=1.8,<2

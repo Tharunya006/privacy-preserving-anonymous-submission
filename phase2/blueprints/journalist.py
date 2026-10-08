@@ -53,6 +53,7 @@ from ..extensions import db
 from ..forms import EmptyForm
 from ..models import Role, record_event
 from ..security import journalist_required, role_required
+from ..socket_events import notify_status_changed
 
 bp = Blueprint("journalist", __name__, url_prefix="/journalist")
 
@@ -187,6 +188,8 @@ def update_submission_status(submission_id: int):
         flash(str(exc), "error")
         return redirect(url_for("journalist.submission_detail", submission_id=submission_id))
 
+    # Phase 6: tell the other journalists (reference + status only, no content).
+    notify_status_changed(submission.id, submission.status, submission.status_label)
     flash(f"Submission #{submission.id} is now {submission.status_label}.", "success")
     return redirect(url_for("journalist.submission_detail", submission_id=submission_id))
 

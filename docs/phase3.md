@@ -137,6 +137,8 @@ Run: `pytest tests/test_phase3.py`, or `pytest` for the whole suite.
 
 ---
 
+Colour modes and transparency handling per format are documented, as measured from the code, in [`phase6.md`](phase6.md) §7.
+
 ## 6. Limitations
 
 * Only metadata is removed. Visible content (faces, reflections, documents in

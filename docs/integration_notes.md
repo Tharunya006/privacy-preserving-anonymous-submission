@@ -1,11 +1,12 @@
-# Integration Notes — Phases 1–5
+# Integration Notes — Phases 1–6
 
 Phase 1 (anonymous submission portal), Phase 2 (authentication &
 authorization), Phase 3 (evidence metadata scrubbing — see
 [`phase3.md`](phase3.md)), Phase 4 (journalist workflow — see
-[`phase4.md`](phase4.md)) and Phase 5 (server-side encryption and integrity —
-see [`phase5.md`](phase5.md)) are integrated into **one Flask application**
-backed by **one database**. This document describes the final architecture, what changed
+[`phase4.md`](phase4.md)), Phase 5 (server-side encryption and integrity —
+see [`phase5.md`](phase5.md)) and Phase 6 (real-time WebSocket notifications
+and traffic analysis — see [`phase6.md`](phase6.md)) are integrated into **one
+Flask application** backed by **one database**. This document describes the final architecture, what changed
 during the integration, and how to run the result.
 
 ---
@@ -215,17 +216,18 @@ All settings come from the environment (`.env`, git-ignored); see
 | `PHASE5_ENCRYPTION_KEY` | **required** | AES-256 key, base64url of 32 random bytes |
 | `PHASE5_HMAC_KEY` | **required** | HMAC-SHA-256 key, a different base64url 32-byte value |
 | `PHASE5_MAX_CLOCK_SKEW_SECONDS` | `300` | how far in the future a protected timestamp may be |
+| `PHASE6_TLS` | unset | `adhoc` serves HTTPS/WSS with a throw-away self-signed certificate (demo) |
+| `PHASE6_TLS_CERT`, `PHASE6_TLS_KEY` | unset | serve HTTPS/WSS with your certificate and key |
 
 `PHASE2_PORT` defaults to 5001 (macOS reserves 5000 for AirPlay).
 
 ---
 
-## 8. Not done yet (later phases)
+## 8. Not implemented (by decision)
 
-* **Phase 6 — WebSocket channel / traffic analysis.** The Flask-SocketIO pins
-  are kept in `requirements.txt` but nothing imports them yet. Precise
-  `created_at` timestamps and the dev server's access log (which prints client
-  IPs) are traffic-analysis concerns for that phase.
+* **Network anonymity** (Tor/onion routing, padding, dummy traffic, random
+  delays). The app stores no source IP, but the network and the server's access
+  log see it. See `phase6.md` §8.
 
 ---
 

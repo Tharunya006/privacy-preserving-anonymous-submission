@@ -213,7 +213,10 @@ def _register_security_headers(app: Flask) -> None:
     def _headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        # "same-origin": the Referer is sent only to this site, never to any
+        # other.  ("no-referrer" broke every form over HTTPS: Flask-WTF's strict
+        # HTTPS CSRF check requires a same-origin Referer.)
+        response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; img-src 'self' data:; style-src 'self'; "

@@ -1,0 +1,314 @@
+{
+  "machine": {
+    "platform": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.13.14",
+    "cryptography": "50.0.2",
+    "pillow": "12.3.0",
+    "measured_at": "2026-10-08 23:53:34"
+  },
+  "primitives": [
+    {
+      "size": "title (200 B)",
+      "bytes": 200,
+      "aes_256_gcm_encrypt": {
+        "runs": 2000,
+        "median_ms": 0.001,
+        "mean_ms": 0.0011,
+        "p95_ms": 0.0011
+      },
+      "aes_256_gcm_decrypt": {
+        "runs": 2000,
+        "median_ms": 0.0003,
+        "mean_ms": 0.0003,
+        "p95_ms": 0.0004
+      },
+      "hmac_sha256": {
+        "runs": 2000,
+        "median_ms": 0.0008,
+        "mean_ms": 0.0008,
+        "p95_ms": 0.0008
+      },
+      "sha256": {
+        "runs": 2000,
+        "median_ms": 0.0003,
+        "mean_ms": 0.0002,
+        "p95_ms": 0.0003
+      }
+    },
+    {
+      "size": "max report (20 KB)",
+      "bytes": 20000,
+      "aes_256_gcm_encrypt": {
+        "runs": 2000,
+        "median_ms": 0.0031,
+        "mean_ms": 0.0031,
+        "p95_ms": 0.0031
+      },
+      "aes_256_gcm_decrypt": {
+        "runs": 2000,
+        "median_ms": 0.0024,
+        "mean_ms": 0.0025,
+        "p95_ms": 0.0026
+      },
+      "hmac_sha256": {
+        "runs": 2000,
+        "median_ms": 0.0065,
+        "mean_ms": 0.0067,
+        "p95_ms": 0.0069
+      },
+      "sha256": {
+        "runs": 2000,
+        "median_ms": 0.006,
+        "mean_ms": 0.006,
+        "p95_ms": 0.0061
+      }
+    },
+    {
+      "size": "1 MB",
+      "bytes": 1000000,
+      "aes_256_gcm_encrypt": {
+        "runs": 40,
+        "median_ms": 0.1012,
+        "mean_ms": 0.1015,
+        "p95_ms": 0.1039
+      },
+      "aes_256_gcm_decrypt": {
+        "runs": 40,
+        "median_ms": 0.0996,
+        "mean_ms": 0.1007,
+        "p95_ms": 0.1021
+      },
+      "hmac_sha256": {
+        "runs": 40,
+        "median_ms": 0.2915,
+        "mean_ms": 0.2964,
+        "p95_ms": 0.3257
+      },
+      "sha256": {
+        "runs": 40,
+        "median_ms": 0.2909,
+        "mean_ms": 0.3005,
+        "p95_ms": 0.3556
+      }
+    },
+    {
+      "size": "max evidence (10 MB)",
+      "bytes": 10000000,
+      "aes_256_gcm_encrypt": {
+        "runs": 8,
+        "median_ms": 1.0206,
+        "mean_ms": 1.0153,
+        "p95_ms": 1.0286
+      },
+      "aes_256_gcm_decrypt": {
+        "runs": 8,
+        "median_ms": 1.0127,
+        "mean_ms": 1.0129,
+        "p95_ms": 1.0557
+      },
+      "hmac_sha256": {
+        "runs": 8,
+        "median_ms": 2.9192,
+        "mean_ms": 2.9188,
+        "p95_ms": 2.9433
+      },
+      "sha256": {
+        "runs": 8,
+        "median_ms": 2.9073,
+        "mean_ms": 2.923,
+        "p95_ms": 2.9683
+      }
+    }
+  ],
+  "phase5_package": [
+    {
+      "size": "title (200 B)",
+      "bytes": 200,
+      "package_bytes": 271,
+      "overhead_bytes": 71,
+      "seal": {
+        "runs": 2000,
+        "median_ms": 0.0037,
+        "mean_ms": 0.0037,
+        "p95_ms": 0.0038
+      },
+      "open_verified": {
+        "runs": 2000,
+        "median_ms": 0.0037,
+        "mean_ms": 0.0039,
+        "p95_ms": 0.004
+      },
+      "reject_tampered": {
+        "runs": 2000,
+        "median_ms": 0.0018,
+        "mean_ms": 0.0018,
+        "p95_ms": 0.0019
+      }
+    },
+    {
+      "size": "max report (20 KB)",
+      "bytes": 20000,
+      "package_bytes": 20071,
+      "overhead_bytes": 71,
+      "seal": {
+        "runs": 2000,
+        "median_ms": 0.0125,
+        "mean_ms": 0.0129,
+        "p95_ms": 0.0133
+      },
+      "open_verified": {
+        "runs": 2000,
+        "median_ms": 0.0126,
+        "mean_ms": 0.0127,
+        "p95_ms": 0.0128
+      },
+      "reject_tampered": {
+        "runs": 2000,
+        "median_ms": 0.0088,
+        "mean_ms": 0.0091,
+        "p95_ms": 0.0094
+      }
+    },
+    {
+      "size": "1 MB",
+      "bytes": 1000000,
+      "package_bytes": 1000071,
+      "overhead_bytes": 71,
+      "seal": {
+        "runs": 40,
+        "median_ms": 0.4323,
+        "mean_ms": 0.4399,
+        "p95_ms": 0.528
+      },
+      "open_verified": {
+        "runs": 40,
+        "median_ms": 0.4299,
+        "mean_ms": 0.4349,
+        "p95_ms": 0.4843
+      },
+      "reject_tampered": {
+        "runs": 40,
+        "median_ms": 0.3412,
+        "mean_ms": 0.3435,
+        "p95_ms": 0.3585
+      }
+    },
+    {
+      "size": "max evidence (10 MB)",
+      "bytes": 10000000,
+      "package_bytes": 10000071,
+      "overhead_bytes": 71,
+      "seal": {
+        "runs": 8,
+        "median_ms": 4.436,
+        "mean_ms": 4.45,
+        "p95_ms": 4.4982
+      },
+      "open_verified": {
+        "runs": 8,
+        "median_ms": 4.4263,
+        "mean_ms": 4.4274,
+        "p95_ms": 4.4487
+      },
+      "reject_tampered": {
+        "runs": 8,
+        "median_ms": 3.6157,
+        "mean_ms": 3.6175,
+        "p95_ms": 3.6461
+      }
+    }
+  ],
+  "text_storage_overhead": {
+    "plaintext_chars": 200,
+    "stored_chars": 367,
+    "note": "71-byte package overhead, then base64url (x4/3) plus the 'p5:' prefix"
+  },
+  "token": {
+    "generate_plus_sha256": {
+      "runs": 2000,
+      "median_ms": 0.0012,
+      "mean_ms": 0.0012,
+      "p95_ms": 0.0012
+    }
+  },
+  "password_pbkdf2_sha256_600k": {
+    "hash": {
+      "runs": 3,
+      "median_ms": 75.1894,
+      "mean_ms": 75.0015,
+      "p95_ms": 75.2396
+    },
+    "verify": {
+      "runs": 3,
+      "median_ms": 74.768,
+      "mean_ms": 74.8922,
+      "p95_ms": 75.2854
+    }
+  },
+  "metadata_scrubbing": [
+    {
+      "image": "JPEG 640x480",
+      "input_bytes": 184548,
+      "output_bytes": 244097,
+      "scrub": {
+        "runs": 8,
+        "median_ms": 2.2011,
+        "mean_ms": 2.1929,
+        "p95_ms": 2.2384
+      }
+    },
+    {
+      "image": "JPEG 1920x1080 (2 MP)",
+      "input_bytes": 1242067,
+      "output_bytes": 1643660,
+      "scrub": {
+        "runs": 8,
+        "median_ms": 14.6431,
+        "mean_ms": 14.6509,
+        "p95_ms": 14.7432
+      }
+    },
+    {
+      "image": "JPEG 4032x3024 (12 MP phone photo)",
+      "input_bytes": 7294025,
+      "output_bytes": 9655782,
+      "scrub": {
+        "runs": 8,
+        "median_ms": 86.5576,
+        "mean_ms": 86.6015,
+        "p95_ms": 87.0614
+      }
+    },
+    {
+      "image": "PNG RGBA 1920x1080",
+      "input_bytes": 3377382,
+      "output_bytes": 3377250,
+      "scrub": {
+        "runs": 8,
+        "median_ms": 153.1311,
+        "mean_ms": 152.87,
+        "p95_ms": 153.5963
+      }
+    }
+  ],
+  "end_to_end_create_submission": {
+    "text only (20 KB report)": {
+      "runs": 100,
+      "median_ms": 0.2628,
+      "mean_ms": 0.2759,
+      "p95_ms": 0.3585
+    },
+    "with 12 MP JPEG evidence": {
+      "runs": 8,
+      "median_ms": 93.9171,
+      "mean_ms": 94.3607,
+      "p95_ms": 96.572
+    }
+  },
+  "breakdown_12mp_submission_ms": {
+    "metadata scrubbing": 86.5576,
+    "seal title + report": 0.0162,
+    "seal scrubbed photo": 4.2903
+  }
+}

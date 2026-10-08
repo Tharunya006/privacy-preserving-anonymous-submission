@@ -599,6 +599,36 @@ a.stat:hover { border-color: var(--line-strong); color: inherit; }
 .history li { font-size: .875rem; padding-left: .9rem; border-left: 2px solid var(--line); }
 .history .when { display: block; color: var(--ink-3); font-size: .8125rem; }
 
+/* ---------------------------------------------------------------- live updates (Phase 6) */
+.live-status {
+  margin: .75rem .5rem; font-size: .8125rem; font-weight: 600; color: var(--ink-3);
+  display: flex; align-items: center; gap: .45rem;
+}
+/* A real state indicator: green when the authenticated socket is connected. */
+.live-status::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--line-strong); }
+.live-status[hidden] { display: none; }
+.live-status[data-state="on"] { color: var(--ok); }
+.live-status[data-state="on"]::before { background: var(--ok); }
+
+.toast-stack {
+  position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 50;
+  display: grid; gap: .6rem; width: min(360px, calc(100vw - 2rem));
+}
+.toast {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: var(--r-box); box-shadow: var(--shadow-2); padding: .9rem 1rem;
+  animation: toast-in .2s var(--ease);
+}
+.toast p { margin: 0 0 .5rem; font-weight: 600; font-size: .9375rem; }
+.toast-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .875rem; }
+.toast-actions a { font-weight: 600; }
+.toast-close {
+  background: none; border: 0; padding: .25rem .4rem; border-radius: 6px;
+  color: var(--ink-3); font: inherit; font-weight: 600; cursor: pointer;
+}
+.toast-close:hover { background: var(--surface-2); color: var(--ink); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
 /* ---------------------------------------------------------------- auth pages */
 .auth-wrap { display: grid; place-items: center; padding: 1.5rem 0 3rem; }
 .auth-card {
@@ -642,6 +672,7 @@ a.stat:hover { border-color: var(--line-strong); color: inherit; }
   .nav-item { flex: none; padding: .45rem .7rem; font-size: .875rem; }
   .sidebar-user { grid-row: 1; grid-column: 2; border-top: 0; padding: 0; display: flex; gap: .5rem; }
   .sidebar-user .avatar, .sidebar-user .who, .sidebar-user .badge { display: none; }
+  .live-status { display: none; }
   .sidebar-user form { margin: 0; }
   .app-main { padding: 1.5rem 1rem 3rem; }
 }

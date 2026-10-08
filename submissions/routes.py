@@ -35,13 +35,16 @@ def submit():
             submission, token = create_submission(
                 form.title.data, form.content.data, evidence
             )
-            notify_new_submission()
         except EvidenceError as exc:
             form.evidence.errors = list(form.evidence.errors) + [str(exc)]
             return render_template("submissions/submit.html", form=form), 400
         except ValueError as exc:
             form.content.errors = list(form.content.errors) + [str(exc)]
             return render_template("submissions/submit.html", form=form), 400
+
+        # Phase 6: content-free real-time notice to authorized journalists.
+        # Sent only after the submission is committed; it cannot fail the request.
+        notify_new_submission()
 
         # Rendered directly (not via redirect + flash) so the token never sits
         # in a URL or in the readable session cookie.  The title shown is the
