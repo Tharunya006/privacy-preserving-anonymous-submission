@@ -8,8 +8,8 @@ report text cannot inject markup.
 from __future__ import annotations
 
 from flask import Blueprint, redirect, render_template, request, url_for
-
 from phase2.models import record_event
+from phase2.socket_events import notify_new_submission
 
 from .forms import StatusLookupForm, SubmissionForm
 from .services import (
@@ -35,6 +35,7 @@ def submit():
             submission, token = create_submission(
                 form.title.data, form.content.data, evidence
             )
+            notify_new_submission()
         except EvidenceError as exc:
             form.evidence.errors = list(form.evidence.errors) + [str(exc)]
             return render_template("submissions/submit.html", form=form), 400

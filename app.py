@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 
 from phase2 import create_app
+from phase2.extensions import socketio
 
 app = create_app()
 
@@ -26,4 +27,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PHASE2_PORT", "5001"))
     host = os.environ.get("PHASE2_HOST", "127.0.0.1")
     debug = (os.environ.get("PHASE2_ENV", "development").lower() == "development")
-    app.run(host=host, port=port, debug=debug)
+    socketio.run(app, host=host, port=port, debug=debug)

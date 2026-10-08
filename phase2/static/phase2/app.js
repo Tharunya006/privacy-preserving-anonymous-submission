@@ -39,3 +39,24 @@
     });
   }
 })();
+
+// Phase 6 - real-time journalist notifications.
+(function () {
+  "use strict";
+
+  if (typeof io === "undefined") return;
+
+  var socket = io();
+
+  socket.on("new_submission", function (data) {
+    var message = document.createElement("div");
+    message.className = "flash success";
+    message.setAttribute("role", "status");
+    message.textContent = data.message || "A new submission has been received.";
+
+    var main = document.querySelector("main");
+    if (main) {
+      main.insertBefore(message, main.firstChild);
+    }
+  });
+})();
