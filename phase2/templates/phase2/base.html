@@ -4,66 +4,122 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}Home{% endblock %} &middot; Anonymous Submission System</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='phase2/favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='phase2/style.css') }}">
 </head>
-<body>
-<header class="site-header">
-  <div class="wrap header-inner">
-    <a class="brand" href="{{ url_for('main.home') }}">
-      <span class="brand-mark">PPASS</span>
-      <span class="brand-sub">Privacy Preserving Anonymous Submission</span>
-    </a>
+{#- Layout choice is presentation only: signed-in staff get the sidebar workspace
+    on staff pages; everyone else (and every public page) gets the public layout. -#}
+{%- set u = current_user() -%}
+{%- set ep = request.endpoint or "" -%}
+{%- set public_pages = ["main.home", "source.submit", "source.status", "auth.login"] -%}
+{%- set staff_layout = u is not none and ep not in public_pages -%}
 
-    <nav class="nav">
-      {% set u = current_user() %}
+{%- macro flashes() -%}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flashes" role="status">
+        {% for category, message in messages %}
+          <li class="alert alert-{{ category }} flash flash-{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+{%- endmacro -%}
+
+{%- macro nav_item(endpoint, label, current, also=()) -%}
+  {%- set active = current == endpoint or current in also -%}
+  <a class="nav-item{% if active %} is-active{% endif %}" href="{{ url_for(endpoint) }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro -%}
+
+{%- macro brand(href, sub) -%}
+  <a class="brand" href="{{ href }}">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-text">
+      <span class="brand-name">PPASS</span>
+      <span class="brand-sub">{{ sub }}</span>
+    </span>
+  </a>
+{%- endmacro -%}
+
+<body class="{{ 'layout-staff' if staff_layout else 'layout-public' }}">
+<a class="skip-link" href="#main">Skip to content</a>
+
+{% if staff_layout %}
+<div class="app-shell">
+  <aside class="sidebar" aria-label="Staff navigation">
+    {{ brand(url_for('main.dashboard_redirect'), 'Staff workspace') }}
+
+    <nav class="side-nav" aria-label="Main">
+      {% if u.is_admin %}
+        {{ nav_item('admin.dashboard', 'Dashboard', ep) }}
+        {{ nav_item('admin.manage_journalists', 'Journalists', ep, ['admin.journalist_detail']) }}
+        {{ nav_item('admin.add_journalist', 'Add journalist', ep) }}
+        {{ nav_item('admin.audit_log', 'Audit log', ep) }}
+      {% else %}
+        {{ nav_item('journalist.dashboard', 'Dashboard', ep) }}
+        {{ nav_item('journalist.inbox', 'Inbox', ep, ['journalist.submission_detail']) }}
+        {{ nav_item('journalist.profile', 'My profile', ep) }}
+      {% endif %}
+      <p class="side-nav-label">Account</p>
+      {{ nav_item('auth.change_password', 'Change password', ep) }}
+    </nav>
+
+    <div class="sidebar-user">
+      <span class="avatar" aria-hidden="true">{{ (u.display_name or u.username)[:1] }}</span>
+      <span class="who" title="{{ u.username }}">{{ u.username }}</span>
+      <span class="badge badge-role">{{ u.role }}</span>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        {{ logout_form.hidden_tag() }}
+        <button type="submit" class="btn btn-secondary btn-small btn-block">Log out</button>
+      </form>
+    </div>
+  </aside>
+
+  <main id="main" class="app-main">
+    <div class="app-content">
+{% else %}
+<header class="site-header">
+  <div class="container header-inner">
+    {{ brand(url_for('main.home'), 'Privacy Preserving Anonymous Submission') }}
+
+    <nav class="header-nav" aria-label="Main">
       {% if u %}
-        {% if u.is_admin %}
-          <a href="{{ url_for('admin.dashboard') }}">Dashboard</a>
-          <a href="{{ url_for('admin.manage_journalists') }}">Journalists</a>
-          <a href="{{ url_for('admin.audit_log') }}">Audit</a>
-        {% else %}
-          <a href="{{ url_for('journalist.dashboard') }}">Dashboard</a>
-          <a href="{{ url_for('journalist.inbox') }}">Inbox</a>
-        {% endif %}
-        <a href="{{ url_for('auth.change_password') }}">Password</a>
-        <span class="who">
-          {{ u.username }}
-          <span class="badge badge-role">{{ u.role }}</span>
-        </span>
+        <a class="nav-link" href="{{ url_for('main.dashboard_redirect') }}">Dashboard</a>
         <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
           {{ logout_form.hidden_tag() }}
-          <button type="submit" class="btn btn-small btn-ghost">Log out</button>
+          <button type="submit" class="btn btn-secondary btn-small">Log out</button>
         </form>
       {% else %}
-        <a href="{{ url_for('source.submit') }}">Submit a report</a>
-        <a href="{{ url_for('source.status') }}">Check status</a>
-        <a href="{{ url_for('auth.login') }}" class="btn btn-small">Sign in</a>
+        <a class="nav-link nav-optional" href="{{ url_for('source.submit') }}"{% if ep == 'source.submit' %} aria-current="page"{% endif %}>Submit a report</a>
+        <a class="nav-link" href="{{ url_for('source.status') }}"{% if ep == 'source.status' %} aria-current="page"{% endif %}>Check status</a>
+        <a class="nav-link staff-link" href="{{ url_for('auth.login') }}"{% if ep == 'auth.login' %} aria-current="page"{% endif %}>Staff login</a>
       {% endif %}
     </nav>
   </div>
 </header>
 
-<main class="wrap main">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <ul class="flashes" role="status">
-        {% for category, message in messages %}
-          <li class="flash flash-{{ category }}">{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-
-  {% block content %}{% endblock %}
+<main id="main" class="site-main">
+  <div class="container">
+{% endif %}
+      {{ flashes() }}
+      {% block content %}{% endblock %}
+{% if staff_layout %}
+    </div>
+  </main>
+</div>
+{% else %}
+  </div>
 </main>
 
 <footer class="site-footer">
-  <div class="wrap">
-    <p>Privacy Preserving Anonymous Submission System &middot; v{{ phase2_version }}</p>
-    <p class="muted">Anonymous sources never create an account and are never asked to log in.</p>
+  <div class="container footer-inner">
+    <p>Anonymous sources never create an account and are never asked to log in.</p>
+    <p><a href="{{ url_for('source.status') }}">Check status</a></p>
   </div>
 </footer>
+{% endif %}
 
 <script src="{{ url_for('static', filename='phase2/app.js') }}" defer></script>
 </body>

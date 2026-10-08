@@ -1,0 +1,40 @@
+{# Shared presentation macros.  Display only: no data is fetched or changed here. #}
+
+{% macro sub_badge(status, label) -%}
+<span class="badge badge-sub-{{ status|lower }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro account_badge(status) -%}
+<span class="badge badge-{{ status|lower }}">{{ status }}</span>
+{%- endmacro %}
+
+{# The three existing submission statuses, in workflow order. #}
+{% macro status_timeline(current, compact=false, audience="source") -%}
+{% set steps = [
+  ("SUBMITTED", "Submitted",
+   "Your report was received and stored securely." if audience == "source" else "Received and stored securely."),
+  ("UNDER_REVIEW", "Under review",
+   "A journalist is looking into your report." if audience == "source" else "A journalist is working on it."),
+  ("CLOSED", "Closed", "The review is finished."),
+] %}
+{% set ns = namespace(passed=false) %}
+<ol class="timeline{% if compact %} timeline-compact{% endif %}" aria-label="Submission progress">
+  {% for value, label, text in steps %}
+    {% if value == current %}
+      {% set state = "done" if value == "CLOSED" else "current" %}
+    {% elif not ns.passed %}
+      {% set state = "done" %}
+    {% else %}
+      {% set state = "upcoming" %}
+    {% endif %}
+    <li class="is-{{ state }}"{% if value == current %} aria-current="step"{% endif %}>
+      <span class="marker" aria-hidden="true"><span class="num">{{ loop.index }}</span></span>
+      <span>
+        <span class="step-label">{{ label }}<span class="visually-hidden"> ({{ "complete" if state == "done" else ("current step" if state == "current" else "not reached yet") }})</span></span>
+        <span class="step-text">{{ text }}</span>
+      </span>
+    </li>
+    {% if value == current %}{% set ns.passed = true %}{% endif %}
+  {% endfor %}
+</ol>
+{%- endmacro %}

@@ -1,75 +1,86 @@
 {% extends "phase2/base.html" %}
+{% import "phase2/_ui.html" as ui %}
 {% block title %}Manage journalists{% endblock %}
 
-{% macro status_badge(status) -%}
-<span class="badge badge-{{ status|lower }}">{{ status }}</span>
-{%- endmacro %}
-
 {% block content %}
-<h1>Manage journalists</h1>
-
-<div class="action-row">
+<header class="page-head page-head-row">
+  <div>
+    <h1>Manage journalists</h1>
+    <p class="lead">Authorize, disable or review journalist accounts. Changes take effect on the journalist's next request.</p>
+  </div>
   <a class="btn" href="{{ url_for('admin.add_journalist') }}">Add journalist</a>
-  <a class="btn btn-ghost {% if not status_filter %}is-active{% endif %}"
-     href="{{ url_for('admin.manage_journalists') }}">All ({{ counts['TOTAL'] }})</a>
-  {% for s in statuses %}
-    <a class="btn btn-ghost {% if status_filter == s %}is-active{% endif %}"
-       href="{{ url_for('admin.manage_journalists', status=s) }}">{{ s }} ({{ counts[s] }})</a>
-  {% endfor %}
-</div>
+</header>
 
-<section class="panel">
+<nav class="tabs" aria-label="Filter by status">
+  <a class="tab {% if not status_filter %}is-active{% endif %}"
+     href="{{ url_for('admin.manage_journalists') }}"{% if not status_filter %} aria-current="page"{% endif %}>
+    All <span class="count">{{ counts['TOTAL'] }}</span>
+  </a>
+  {% for s in statuses %}
+    <a class="tab {% if status_filter == s %}is-active{% endif %}"
+       href="{{ url_for('admin.manage_journalists', status=s) }}"{% if status_filter == s %} aria-current="page"{% endif %}>
+      {{ s|capitalize }} <span class="count">{{ counts[s] }}</span>
+    </a>
+  {% endfor %}
+</nav>
+
+<section class="panel panel-flush" aria-label="Journalists">
   {% if journalists %}
-  <table class="table">
-    <thead>
-      <tr>
-        <th>ID</th><th>Username</th><th>Name</th><th>Status</th>
-        <th>Last login</th><th>Created</th><th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for j in journalists %}
-      <tr>
-        <td>{{ j.id }}</td>
-        <td><a href="{{ url_for('admin.journalist_detail', user_id=j.id) }}">{{ j.username }}</a></td>
-        <td>{{ j.display_name or '-' }}</td>
-        <td>{{ status_badge(j.status) }}{% if j.must_change_password %}
-              <span class="badge badge-temp">temp password</span>{% endif %}</td>
-        <td class="nowrap">{{ j.last_login_at.strftime('%Y-%m-%d %H:%M') if j.last_login_at else 'never' }}</td>
-        <td class="nowrap">{{ j.created_at.strftime('%Y-%m-%d') }}</td>
-        <td class="actions">
-          {% if j.status != 'AUTHORIZED' %}
-          <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
-            {{ action_form.hidden_tag() }}
-            <input type="hidden" name="status" value="AUTHORIZED">
-            <input type="hidden" name="return_to" value="{{ request.full_path }}">
-            <button class="btn btn-small" type="submit">Authorize</button>
-          </form>
-          {% endif %}
-          {% if j.status != 'DISABLED' %}
-          <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form"
-                data-confirm="Disable {{ j.username }}? They will lose access immediately.">
-            {{ action_form.hidden_tag() }}
-            <input type="hidden" name="status" value="DISABLED">
-            <input type="hidden" name="return_to" value="{{ request.full_path }}">
-            <button class="btn btn-small btn-danger" type="submit">Disable</button>
-          </form>
-          {% endif %}
-          {% if j.status != 'PENDING' %}
-          <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
-            {{ action_form.hidden_tag() }}
-            <input type="hidden" name="status" value="PENDING">
-            <input type="hidden" name="return_to" value="{{ request.full_path }}">
-            <button class="btn btn-small btn-ghost" type="submit">Set pending</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead>
+        <tr>
+          <th>ID</th><th>Username</th><th>Name</th><th>Status</th>
+          <th>Last login</th><th>Created</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for j in journalists %}
+        <tr>
+          <td class="ref" data-label="ID">{{ j.id }}</td>
+          <td class="cell-main" data-label="Username"><a class="title-link" href="{{ url_for('admin.journalist_detail', user_id=j.id) }}">{{ j.username }}</a></td>
+          <td data-label="Name">{{ j.display_name or '-' }}</td>
+          <td data-label="Status">{{ ui.account_badge(j.status) }}{% if j.must_change_password %}
+                <span class="badge badge-temp">temp password</span>{% endif %}</td>
+          <td class="nowrap" data-label="Last login">{{ j.last_login_at.strftime('%Y-%m-%d %H:%M') if j.last_login_at else 'never' }}</td>
+          <td class="nowrap" data-label="Created">{{ j.created_at.strftime('%Y-%m-%d') }}</td>
+          <td class="actions" data-label="Actions">
+            {% if j.status != 'AUTHORIZED' %}
+            <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
+              {{ action_form.hidden_tag() }}
+              <input type="hidden" name="status" value="AUTHORIZED">
+              <input type="hidden" name="return_to" value="{{ request.full_path }}">
+              <button class="btn btn-small" type="submit">Authorize</button>
+            </form>
+            {% endif %}
+            {% if j.status != 'DISABLED' %}
+            <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form"
+                  data-confirm="Disable {{ j.username }}? They will lose access immediately.">
+              {{ action_form.hidden_tag() }}
+              <input type="hidden" name="status" value="DISABLED">
+              <input type="hidden" name="return_to" value="{{ request.full_path }}">
+              <button class="btn btn-small btn-danger" type="submit">Disable</button>
+            </form>
+            {% endif %}
+            {% if j.status != 'PENDING' %}
+            <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
+              {{ action_form.hidden_tag() }}
+              <input type="hidden" name="status" value="PENDING">
+              <input type="hidden" name="return_to" value="{{ request.full_path }}">
+              <button class="btn btn-small btn-secondary" type="submit">Set pending</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-    <p class="muted">No journalist accounts{% if status_filter %} with status {{ status_filter }}{% endif %} yet.</p>
+    <div class="empty">
+      <strong>No journalist accounts{% if status_filter %} with status {{ status_filter }}{% endif %} yet</strong>
+      <a href="{{ url_for('admin.add_journalist') }}">Add a journalist</a> to get started.
+    </div>
   {% endif %}
 </section>
 {% endblock %}

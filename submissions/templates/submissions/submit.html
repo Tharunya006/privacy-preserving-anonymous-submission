@@ -2,49 +2,98 @@
 {% block title %}Submit a report{% endblock %}
 
 {% block content %}
-<h1>Anonymous submission</h1>
-<p class="muted">
-  Submit your information without creating an account. No login, no email and no
-  name are asked for, and your IP address is not stored with the report.
-</p>
-
-<form method="post" action="{{ url_for('source.submit') }}" enctype="multipart/form-data"
-      class="panel form-panel" novalidate>
-  {{ form.hidden_tag() }}
-
-  <div class="field">
-    {{ form.title.label }}
-    {{ form.title(required=true, maxlength=200, autocomplete="off") }}
-    {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
-
-  <div class="field">
-    {{ form.content.label }}
-    {{ form.content(required=true, rows=10, maxlength=20000) }}
-    {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
-
-  <div class="field">
-    {{ form.evidence.label }}
-    {{ form.evidence(accept=".jpg,.jpeg,.png,.gif,.webp,.txt,.csv") }}
-    <p class="hint">
-      Optional. Images (JPEG, PNG, GIF, WebP) or plain text / CSV, up to
-      {{ config['EVIDENCE_MAX_BYTES'] // (1024 * 1024) }} MB.
+<div class="narrow">
+  <header class="page-head">
+    <h1>Submit a report</h1>
+    <p class="lead">
+      You do not need an account, and nothing on this page asks who you are.
+      Your IP address is not stored with the report.
     </p>
-    <p class="hint">
-      Hidden image metadata &mdash; GPS location, camera make, model and serial number,
-      date taken, editing software &mdash; is <strong>removed automatically before the
-      file is stored</strong>; the original is never saved. Documents such as PDF or
-      Word files are not accepted, because their author details cannot be removed.
-    </p>
-    <p class="hint hint-warn">
-      Metadata removal cannot hide what is <em>visible</em> in a picture (faces,
-      reflections, screens, landmarks). Check the content itself before sending.
-    </p>
-    {% for error in form.evidence.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
+  </header>
 
-  {{ form.submit(class="btn") }}
-  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Cancel</a>
-</form>
+  <form method="post" action="{{ url_for('source.submit') }}" enctype="multipart/form-data"
+        class="form-card" novalidate>
+    {{ form.hidden_tag() }}
+
+    <section class="form-section" aria-labelledby="report-heading">
+      <div class="form-section-intro">
+        <h2 id="report-heading">Your report</h2>
+        <p>Describe what happened in your own words. Dates, places and organisations help journalists check the facts.</p>
+      </div>
+      <div>
+        <div class="field">
+          {{ form.title.label }}
+          {{ form.title(required=true, maxlength=200, autocomplete="off",
+                        placeholder="For example: Unsafe conditions at the depot") }}
+          {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="field">
+          {{ form.content.label }}
+          {{ form.content(required=true, rows=10, maxlength=20000) }}
+          <p class="hint">Up to 20,000 characters.</p>
+          {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section" aria-labelledby="evidence-heading">
+      <div class="form-section-intro">
+        <h2 id="evidence-heading">Evidence</h2>
+        <p>Optional. Add one photo or text file that supports your report.</p>
+      </div>
+      <div>
+        <div class="field">
+          {{ form.evidence.label }}
+          <div class="file-drop">
+            {{ form.evidence(accept=".jpg,.jpeg,.png,.gif,.webp,.txt,.csv",
+                             data_max_bytes=config['EVIDENCE_MAX_BYTES'],
+                             data_status="evidence-status",
+                             **{"aria-describedby": "evidence-help"}) }}
+            <p class="file-status" id="evidence-status" aria-live="polite"></p>
+          </div>
+          <p class="hint" id="evidence-help">
+            Images (JPEG, PNG, GIF, WebP) or plain text / CSV, up to
+            {{ config['EVIDENCE_MAX_BYTES'] // (1024 * 1024) }} MB.
+            PDF and Word files are not accepted, because their author details cannot be removed.
+          </p>
+          {% for error in form.evidence.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="alert alert-info">
+          <p>
+            Hidden photo details such as GPS location, camera model and the date taken are
+            <strong>removed automatically before the file is stored</strong>. The original
+            is never saved.
+          </p>
+        </div>
+        <div class="alert alert-warn">
+          <p>
+            Removing hidden details cannot hide what is <em>visible</em> in a photo, such as
+            faces, reflections, screens or landmarks. Check the picture itself before sending.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section" aria-labelledby="next-heading">
+      <div class="form-section-intro">
+        <h2 id="next-heading">Before you submit</h2>
+        <p>What happens to your report.</p>
+      </div>
+      <ul class="check-list">
+        <li>Your report and any file are encrypted before they are saved.</li>
+        <li>Only journalists approved by an administrator can read them.</li>
+        <li>You will receive a private token. It is shown only once, so save it.</li>
+      </ul>
+    </section>
+
+    <div class="form-footer">
+      <p>Nothing on this form identifies you unless you write it in the report yourself.</p>
+      <div class="action-row">
+        <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Cancel</a>
+        {{ form.submit(class="btn btn-lg") }}
+      </div>
+    </div>
+  </form>
+</div>
 {% endblock %}

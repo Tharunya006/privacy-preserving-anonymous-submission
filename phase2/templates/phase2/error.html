@@ -2,9 +2,23 @@
 {% block title %}Error {{ code }}{% endblock %}
 
 {% block content %}
-<section class="panel panel-error">
-  <h1>{{ code }}</h1>
+<section class="panel error-card panel-error" role="alert">
+  {% set headings = {
+    400: "Something was wrong with that request",
+    404: "Page not found",
+    405: "That action is not allowed here",
+    409: "Integrity check failed",
+    413: "That upload is too large",
+    500: "Something went wrong",
+  } %}
+  <p class="error-code">ERROR {{ code }}</p>
+  <h1>{{ headings.get(code, "Something went wrong") }}</h1>
   <p>{{ message }}</p>
-  <a class="btn" href="{{ url_for('main.home') }}">Return home</a>
+  <div class="action-row">
+    {% if current_user() %}
+      <a class="btn" href="{{ url_for('main.dashboard_redirect') }}">Go to my dashboard</a>
+    {% endif %}
+    <a class="btn {{ 'btn-secondary' if current_user() else '' }}" href="{{ url_for('main.home') }}">Return home</a>
+  </div>
 </section>
 {% endblock %}

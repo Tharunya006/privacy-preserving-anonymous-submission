@@ -2,70 +2,70 @@
 {% block title %}Journalist dashboard{% endblock %}
 
 {% block content %}
-<h1>Journalist dashboard</h1>
-<p class="muted">
-  Signed in as <strong>{{ user.display_name or user.username }}</strong>
-  <span class="badge badge-role">{{ user.role }}</span>
-  <span class="badge badge-authorized">{{ user.status }}</span>
-</p>
+<header class="page-head">
+  <h1>Journalist dashboard</h1>
+  <p class="lead">
+    Signed in as <strong>{{ user.display_name or user.username }}</strong>
+    <span class="badge badge-role">{{ user.role }}</span>
+    <span class="badge badge-authorized">{{ user.status }}</span>
+  </p>
+</header>
 
-<div class="stat-row">
-  <div class="stat"><span class="stat-num">{{ submission_counts['TOTAL'] }}</span><span class="stat-label">Submissions</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span><span class="stat-label">New</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span><span class="stat-label">Under review</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['CLOSED'] }}</span><span class="stat-label">Closed</span></div>
+<div class="stats">
+  <a class="stat stat-primary" href="{{ url_for('journalist.inbox') }}">
+    <span class="stat-label">Submissions</span>
+    <span class="stat-num">{{ submission_counts['TOTAL'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('journalist.inbox', status='SUBMITTED') }}">
+    <span class="stat-label">New</span>
+    <span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('journalist.inbox', status='UNDER_REVIEW') }}">
+    <span class="stat-label">Under review</span>
+    <span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('journalist.inbox', status='CLOSED') }}">
+    <span class="stat-label">Closed</span>
+    <span class="stat-num">{{ submission_counts['CLOSED'] }}</span>
+  </a>
 </div>
 
-<div class="card-grid">
-  <section class="card">
-    <h2>Submission inbox</h2>
-    <p>Read anonymous reports, download evidence and update their status.</p>
-    <a class="btn btn-ghost" href="{{ url_for('journalist.inbox') }}">Open inbox</a>
-  </section>
-
-  <section class="card">
-    <h2>My account</h2>
-    <p>Review your account details and authorization state.</p>
-    <a class="btn btn-ghost" href="{{ url_for('journalist.profile') }}">View profile</a>
-  </section>
-
-  <section class="card">
-    <h2>Security</h2>
-    <p>Change your password. If an administrator issued you a temporary one, you must change it.</p>
-    <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change password</a>
-  </section>
-</div>
-
-<section class="panel">
-  <h2>New submissions</h2>
+<section class="panel panel-flush" aria-labelledby="new-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="new-heading">New submissions</h2>
+      <p class="muted small">The newest reports nobody has started reviewing yet.</p>
+    </div>
+    <a class="btn btn-secondary btn-small" href="{{ url_for('journalist.inbox', status='SUBMITTED') }}">View all new</a>
+  </div>
   {% if new_submissions %}
-    <table class="table">
-      <thead><tr><th>Ref.</th><th>Title</th><th>Received (UTC)</th></tr></thead>
-      <tbody>
-      {% for s, title in new_submissions %}
-        <tr>
-          <td class="nowrap">#{{ s.id }}</td>
-          <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="field-error">integrity check failed</span>{% endif %}</a></td>
-          <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <p><a href="{{ url_for('journalist.inbox', status='SUBMITTED') }}">All new submissions &rarr;</a></p>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th>Ref.</th><th>Title</th><th>Received (UTC)</th></tr></thead>
+        <tbody>
+        {% for s, title in new_submissions %}
+          <tr>
+            <td class="ref" data-label="Ref.">#{{ s.id }}</td>
+            <td class="cell-main" data-label="Title">
+              <a class="title-link" href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="integrity-failed">integrity check failed</span>{% endif %}</a>
+            </td>
+            <td class="nowrap" data-label="Received">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">No new submissions waiting for review.</p>
+    <div class="empty"><strong>You are all caught up</strong>No new submissions are waiting for review.</div>
   {% endif %}
 </section>
 
-<section class="panel">
-  <h2>Access status</h2>
-  <p>
-    Your account is <strong>{{ user.status }}</strong>. Access is re-checked on
-    every request &mdash; if an administrator disables this account, you lose
-    access immediately, without waiting for the session to expire.
-  </p>
-  <p class="muted small">Last sign-in:
-    {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'this is your first' }}.
+<section class="panel" aria-labelledby="access-heading">
+  <h2 id="access-heading">Access status</h2>
+  <p class="muted small">
+    Your account is <strong>{{ user.status }}</strong>. Access is checked again on every
+    request, so if an administrator disables this account, access stops immediately.
+    Last sign-in: {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'this is your first' }}.
   </p>
 </section>
 {% endblock %}

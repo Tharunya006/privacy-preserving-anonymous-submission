@@ -2,80 +2,98 @@
 {% block title %}Admin dashboard{% endblock %}
 
 {% block content %}
-<h1>Admin dashboard</h1>
-<p class="muted">Signed in as <strong>{{ user.username }}</strong> (ADMIN).</p>
-
-<div class="stat-row">
-  <div class="stat"><span class="stat-num">{{ counts['TOTAL'] }}</span><span class="stat-label">Journalists</span></div>
-  <div class="stat"><span class="stat-num">{{ counts['PENDING'] }}</span><span class="stat-label">Pending</span></div>
-  <div class="stat"><span class="stat-num">{{ counts['AUTHORIZED'] }}</span><span class="stat-label">Authorized</span></div>
-  <div class="stat"><span class="stat-num">{{ counts['DISABLED'] }}</span><span class="stat-label">Disabled</span></div>
-</div>
-
-<h2>Anonymous submissions</h2>
-<div class="stat-row">
-  <div class="stat"><span class="stat-num">{{ submission_counts['TOTAL'] }}</span><span class="stat-label">Total</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span><span class="stat-label">Submitted</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span><span class="stat-label">Under review</span></div>
-  <div class="stat"><span class="stat-num">{{ submission_counts['CLOSED'] }}</span><span class="stat-label">Closed</span></div>
-</div>
-<p class="muted small">
-  Administrators see counts only. Report content is visible to authorized journalists.
-</p>
-
-<div class="action-row">
+<header class="page-head page-head-row">
+  <div>
+    <h1>Admin dashboard</h1>
+    <p class="lead">Signed in as <strong>{{ user.username }}</strong> (ADMIN). Manage journalist access and review activity.</p>
+  </div>
   <a class="btn" href="{{ url_for('admin.add_journalist') }}">Add journalist</a>
-  <a class="btn btn-ghost" href="{{ url_for('admin.manage_journalists') }}">Manage journalists</a>
-  <a class="btn btn-ghost" href="{{ url_for('admin.audit_log') }}">Full audit log</a>
+</header>
+
+<h2 class="section-title">Journalist accounts</h2>
+<div class="stats">
+  <a class="stat stat-primary" href="{{ url_for('admin.manage_journalists') }}">
+    <span class="stat-label">Journalists</span><span class="stat-num">{{ counts['TOTAL'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('admin.manage_journalists', status='PENDING') }}">
+    <span class="stat-label">Pending</span><span class="stat-num">{{ counts['PENDING'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('admin.manage_journalists', status='AUTHORIZED') }}">
+    <span class="stat-label">Authorized</span><span class="stat-num">{{ counts['AUTHORIZED'] }}</span>
+  </a>
+  <a class="stat" href="{{ url_for('admin.manage_journalists', status='DISABLED') }}">
+    <span class="stat-label">Disabled</span><span class="stat-num">{{ counts['DISABLED'] }}</span>
+  </a>
 </div>
 
-<section class="panel">
-  <h2>Awaiting authorization</h2>
+<h2 class="section-title">Anonymous submissions</h2>
+<div class="stats">
+  <div class="stat"><span class="stat-label">Total</span><span class="stat-num">{{ submission_counts['TOTAL'] }}</span></div>
+  <div class="stat"><span class="stat-label">Submitted</span><span class="stat-num">{{ submission_counts['SUBMITTED'] }}</span></div>
+  <div class="stat"><span class="stat-label">Under review</span><span class="stat-num">{{ submission_counts['UNDER_REVIEW'] }}</span></div>
+  <div class="stat"><span class="stat-label">Closed</span><span class="stat-num">{{ submission_counts['CLOSED'] }}</span></div>
+</div>
+<div class="alert alert-info">
+  <p>Administrators see counts only. Report content is visible to authorized journalists.</p>
+</div>
+
+<section class="panel panel-flush" aria-labelledby="pending-heading">
+  <div class="panel-head">
+    <h2 id="pending-heading">Awaiting authorization</h2>
+    <a class="btn btn-secondary btn-small" href="{{ url_for('admin.manage_journalists') }}">Manage journalists</a>
+  </div>
   {% if pending %}
-    <table class="table">
-      <thead><tr><th>Username</th><th>Name</th><th>Created</th><th>Action</th></tr></thead>
-      <tbody>
-      {% for j in pending %}
-        <tr>
-          <td><a href="{{ url_for('admin.journalist_detail', user_id=j.id) }}">{{ j.username }}</a></td>
-          <td>{{ j.display_name or '-' }}</td>
-          <td>{{ j.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>
-            <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
-              {{ action_form.hidden_tag() }}
-              <input type="hidden" name="status" value="AUTHORIZED">
-              <input type="hidden" name="return_to" value="{{ url_for('admin.dashboard') }}">
-              <button class="btn btn-small" type="submit">Authorize</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th>Username</th><th>Name</th><th>Created</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for j in pending %}
+          <tr>
+            <td class="cell-main" data-label="Username"><a class="title-link" href="{{ url_for('admin.journalist_detail', user_id=j.id) }}">{{ j.username }}</a></td>
+            <td data-label="Name">{{ j.display_name or '-' }}</td>
+            <td class="nowrap" data-label="Created">{{ j.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="actions" data-label="Action">
+              <form method="post" action="{{ url_for('admin.change_status', user_id=j.id) }}" class="inline-form">
+                {{ action_form.hidden_tag() }}
+                <input type="hidden" name="status" value="AUTHORIZED">
+                <input type="hidden" name="return_to" value="{{ url_for('admin.dashboard') }}">
+                <button class="btn btn-small" type="submit">Authorize</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">No accounts are waiting for authorization.</p>
+    <div class="empty"><strong>Nothing waiting</strong>No accounts are waiting for authorization.</div>
   {% endif %}
 </section>
 
-<section class="panel">
-  <h2>Recent activity</h2>
+<section class="panel panel-flush" aria-labelledby="activity-heading">
+  <div class="panel-head">
+    <h2 id="activity-heading">Recent activity</h2>
+    <a class="btn btn-secondary btn-small" href="{{ url_for('admin.audit_log') }}">Full audit log</a>
+  </div>
   {% if recent_events %}
-    <table class="table">
-      <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th></tr></thead>
-      <tbody>
-      {% for e in recent_events %}
-        <tr>
-          <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-          <td><code>{{ e.action }}</code></td>
-          <td>{{ e.actor_username or '-' }}</td>
-          <td>{{ e.target or '-' }}</td>
-          <td class="muted">{{ e.detail or '' }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th></tr></thead>
+        <tbody>
+        {% for e in recent_events %}
+          <tr>
+            <td class="nowrap" data-label="Time">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td data-label="Action"><code>{{ e.action }}</code></td>
+            <td data-label="Actor">{{ e.actor_username or '-' }}</td>
+            <td data-label="Target">{{ e.target or '-' }}</td>
+            <td class="muted" data-label="Detail">{{ e.detail or '' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">No activity recorded yet.</p>
+    <div class="empty"><strong>No activity yet</strong>Security events will be listed here.</div>
   {% endif %}
 </section>
 {% endblock %}

@@ -3,56 +3,75 @@
 
 {% block content %}
 <section class="hero">
-  <h1>Privacy Preserving Anonymous Submission System</h1>
-  <p class="lead">
-    A secure channel between anonymous sources and authorized journalists.
-  </p>
+  <div>
+    <h1>Report Safely. <span class="accent">Stay Anonymous.</span></h1>
+    <p class="lead">
+      Send information to trusted journalists without creating an account.
+      We never ask who you are.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-lg" href="{{ url_for('source.submit') }}">Submit a report</a>
+      <a class="btn btn-secondary btn-lg" href="{{ url_for('source.status') }}">Check submission status</a>
+    </div>
+  </div>
+
+  <aside class="how-panel" aria-labelledby="how-title">
+    <h2 id="how-title">What happens when you report</h2>
+    <ol class="how-list">
+      <li>
+        <strong>Write your report</strong>
+        <span>Describe what happened. Add a photo or a text file if you have one.</span>
+      </li>
+      <li>
+        <strong>Save your private token</strong>
+        <span>You get a secret code once. It is the only link to your report.</span>
+      </li>
+      <li>
+        <strong>Follow its progress</strong>
+        <span>Enter the token any time to see whether your report is being reviewed.</span>
+      </li>
+    </ol>
+  </aside>
 </section>
 
-<div class="card-grid">
-  <section class="card card-source">
-    <h2>I am a source</h2>
-    <p>
-      <strong>No account. No login. No email.</strong>
-      Anonymous sources are never registered in the user database and are never
-      asked to identify themselves.
-    </p>
-    <p class="muted">
-      You receive a random token after submitting. It is the only way to check
-      your report's status, so keep it safe.
-    </p>
-    <a class="btn" href="{{ url_for('source.submit') }}">Submit a report</a>
-    <a class="btn btn-ghost" href="{{ url_for('source.status') }}">Check status</a>
-  </section>
+<section class="promises" aria-labelledby="promises-title">
+  <h2 id="promises-title">Built to protect people who speak up</h2>
+  <p class="lead">Every report is handled the same careful way, from the moment you press submit.</p>
 
-  <section class="card">
-    <h2>I am a journalist</h2>
-    <p>
-      Authorized receivers sign in to review submissions. Accounts are created by
-      an administrator and must be explicitly authorized before first use.
-    </p>
-    <a class="btn" href="{{ url_for('auth.login') }}">Sign in</a>
-  </section>
+  <div class="promise-grid">
+    <article class="promise">
+      <h3>Anonymous submission</h3>
+      <p>
+        <strong>No account. No login. No email.</strong>
+        Your name and your internet address are never saved with your report.
+      </p>
+    </article>
+    <article class="promise">
+      <h3>Report protection</h3>
+      <p>
+        Your report is locked with strong encryption before it is saved. Only
+        journalists approved by an administrator can open it.
+      </p>
+    </article>
+    <article class="promise">
+      <h3>Hidden photo details removed</h3>
+      <p>
+        Photos can secretly carry the place they were taken and the camera used.
+        We remove those details automatically before anything is stored.
+      </p>
+    </article>
+    <article class="promise">
+      <h3>Status tracking</h3>
+      <p>
+        Use your private token to follow your report from Submitted to Under
+        review to Closed. No sign-in needed.
+      </p>
+    </article>
+  </div>
 
-  <section class="card">
-    <h2>I am an administrator</h2>
-    <p>
-      Administrators create journalist accounts, authorize or disable them, and
-      review the audit trail. There is no public administrator registration.
-    </p>
-    <a class="btn btn-ghost" href="{{ url_for('auth.login') }}">Admin sign in</a>
-  </section>
-</div>
-
-<section class="panel">
-  <h2>What the system enforces</h2>
-  <ul class="tick-list">
-    <li>Passwords are stored only as salted PBKDF2-HMAC-SHA256 hashes.</li>
-    <li>Every protected route is checked on the server, not just hidden in the UI.</li>
-    <li>Journalists move through PENDING &rarr; AUTHORIZED &rarr; DISABLED under admin control.</li>
-    <li>Sessions are HttpOnly, SameSite, time-limited, and rebuilt at each sign-in.</li>
-    <li>Every state-changing form carries a CSRF token.</li>
-    <li>Submission tokens are random and stored only as a hash; no source IP is kept.</li>
-  </ul>
+  <div class="staff-strip">
+    <p>Are you a journalist or administrator?</p>
+    <a class="btn btn-secondary btn-small" href="{{ url_for('auth.login') }}">Staff login</a>
+  </div>
 </section>
 {% endblock %}

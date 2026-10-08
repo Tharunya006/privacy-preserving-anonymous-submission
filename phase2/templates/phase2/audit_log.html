@@ -2,26 +2,32 @@
 {% block title %}Audit log{% endblock %}
 
 {% block content %}
-<h1>Audit log</h1>
-<p class="muted">Most recent 100 security events. Passwords are never recorded.</p>
+<header class="page-head">
+  <h1>Audit log</h1>
+  <p class="lead">Most recent 100 security events. Passwords, report content and submission tokens are never recorded.</p>
+</header>
 
-<section class="panel">
+<section class="panel panel-flush" aria-label="Audit events">
   {% if events %}
-  <table class="table">
-    <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
-    <tbody>
-    {% for e in events %}
-      <tr>
-        <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td><code>{{ e.action }}</code></td>
-        <td>{{ e.actor_username or '-' }}</td>
-        <td>{{ e.target or '-' }}</td>
-        <td class="muted">{{ e.detail or '' }}</td>
-        <td class="muted">{{ e.ip_address or '-' }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<p class="muted">No events recorded yet.</p>{% endif %}
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+      <tbody>
+      {% for e in events %}
+        <tr>
+          <td class="nowrap" data-label="Time">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td data-label="Action"><code>{{ e.action }}</code></td>
+          <td data-label="Actor">{{ e.actor_username or '-' }}</td>
+          <td data-label="Target">{{ e.target or '-' }}</td>
+          <td class="muted" data-label="Detail">{{ e.detail or '' }}</td>
+          <td class="muted" data-label="IP">{{ e.ip_address or '-' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty"><strong>No events recorded yet</strong>Sign-ins, account changes and report access will appear here.</div>
+  {% endif %}
 </section>
 {% endblock %}

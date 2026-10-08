@@ -1,37 +1,53 @@
 {% extends "phase2/base.html" %}
+{% import "phase2/_ui.html" as ui %}
 {% block title %}Check submission status{% endblock %}
 
 {% block content %}
-<h1>Check submission status</h1>
+<div class="narrow">
+  <header class="page-head">
+    <h1>Check submission status</h1>
+    <p class="lead">Enter the private token you received after submitting your report.</p>
+  </header>
 
-{% if submission %}
-<section class="panel">
-  <h2>Submission status</h2>
-  <dl class="detail-list">
-    <dt>Title</dt><dd>{% if title is not none %}{{ title }}{% else %}<span class="muted">unavailable (integrity check failed)</span>{% endif %}</dd>
-    <dt>Status</dt><dd><span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span></dd>
-    <dt>Submitted</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
-    <dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
-  </dl>
-</section>
-{% elif not_found %}
-<section class="panel panel-error">
-  <h2>Submission not found</h2>
-  <p>No submission was found with this token. Check it and try again.</p>
-</section>
-{% endif %}
+  {% if submission %}
+  <section class="panel status-result" aria-labelledby="result-heading">
+    <div class="panel-head">
+      <div>
+        <h2 id="result-heading">
+          {% if title is not none %}{{ title }}{% else %}<span class="muted">Title unavailable (integrity check failed)</span>{% endif %}
+        </h2>
+      </div>
+      {{ ui.sub_badge(submission.status, submission.status_label) }}
+    </div>
 
-<p class="muted">Enter the token from your receipt to check the status of your report.</p>
+    {{ ui.status_timeline(submission.status) }}
 
-<form method="post" action="{{ url_for('source.status') }}" class="panel form-panel" novalidate>
-  {{ form.hidden_tag() }}
-  <div class="field">
-    {{ form.token.label }}
-    {{ form.token(required=true, maxlength=128, autocomplete="off",
-                  placeholder="Enter your submission token") }}
-    {% for error in form.token.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-  </div>
-  {{ form.submit(class="btn") }}
-  <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Back to home</a>
-</form>
+    <dl class="status-meta">
+      <div><dt>Current status</dt><dd>{{ submission.status_label }}</dd></div>
+      <div><dt>Submitted</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd></div>
+      <div><dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd></div>
+    </dl>
+  </section>
+  {% elif not_found %}
+  <section class="panel panel-error" role="alert">
+    <h2>Submission not found</h2>
+    <p class="muted">No submission was found with this token. Check that it was copied completely and try again.</p>
+  </section>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('source.status') }}" class="panel" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="field">
+      {{ form.token.label }}
+      {{ form.token(required=true, maxlength=128, autocomplete="off", spellcheck="false",
+                    placeholder="Paste your submission token") }}
+      <p class="hint">Your token is never shown in the address bar or kept in your browser history.</p>
+      {% for error in form.token.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="action-row">
+      {{ form.submit(class="btn") }}
+      <a class="btn btn-ghost" href="{{ url_for('main.home') }}">Back to home</a>
+    </div>
+  </form>
+</div>
 {% endblock %}

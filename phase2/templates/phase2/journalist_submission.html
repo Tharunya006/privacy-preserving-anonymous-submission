@@ -1,95 +1,108 @@
 {% extends "phase2/base.html" %}
+{% import "phase2/_ui.html" as ui %}
 {% block title %}Submission #{{ submission.id }}{% endblock %}
 
 {% block content %}
-<h1>{{ report.title }}</h1>
-<p>
-  <span class="badge badge-sub-{{ submission.status|lower }}">{{ submission.status_label }}</span>
-  <span class="muted small">Submission #{{ submission.id }}</span>
-</p>
-<p class="muted small">
-  The source is anonymous: no name, account, IP address or session is stored with
-  this report. The report and evidence are stored encrypted (AES-256-GCM) and
-  passed their HMAC-SHA-256 integrity and timestamp checks before being shown.
-</p>
+<a class="back-link" href="{{ url_for('journalist.inbox') }}">&larr; Back to inbox</a>
 
-<section class="panel">
-  <h2>Report</h2>
-  <div class="report-body">{{ report.content }}</div>
-</section>
+<header class="page-head">
+  <h1 class="report-title">{{ report.title }}</h1>
+  <div class="report-meta">
+    <span class="ref">Submission #{{ submission.id }}</span>
+    {{ ui.sub_badge(submission.status, submission.status_label) }}
+    <span>Received {{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+  </div>
+</header>
 
-<section class="panel">
-  <h2>Details</h2>
-  <dl class="detail-list">
-    <dt>Received</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
-    <dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
-  </dl>
-</section>
+<div class="detail-grid">
+  <div class="stack">
+    <section class="panel" aria-labelledby="report-heading">
+      <h2 id="report-heading" class="visually-hidden">Report</h2>
+      <div class="report-body">{{ report.content }}</div>
+    </section>
 
-<section class="panel">
-  <h2>Evidence</h2>
-  {% if submission.evidence %}
-    <p class="hint hint-warn">
-      Images were re-encoded with all metadata (EXIF, GPS, XMP, ICC, comments)
-      removed before storage; the original upload was never saved. Open files in an
-      isolated environment all the same.
-    </p>
-    <table class="table">
-      <thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead>
-      <tbody>
-      {% for e in submission.evidence %}
-        <tr>
-          <td><code>{{ e.download_name }}</code></td>
-          <td>{{ e.extension|upper }}</td>
-          <td class="nowrap">{{ '%.1f'|format(e.size_bytes / 1024) }} KB</td>
-          <td>
-            <a class="btn btn-small btn-ghost"
+    <section class="panel" aria-labelledby="evidence-heading">
+      <div class="panel-head">
+        <h2 id="evidence-heading">Evidence</h2>
+        <span class="muted small">{{ submission.evidence|length }} file{{ '' if submission.evidence|length == 1 else 's' }}</span>
+      </div>
+      {% if submission.evidence %}
+        <ul class="evidence-list">
+          {% for e in submission.evidence %}
+          <li class="evidence-item">
+            <span class="file">
+              <span class="file-type" aria-hidden="true">{{ e.extension|upper }}</span>
+              <span>
+                <code>{{ e.download_name }}</code>
+                <span class="size">{{ e.extension|upper }} &middot; {{ '%.1f'|format(e.size_bytes / 1024) }} KB</span>
+              </span>
+            </span>
+            <a class="btn btn-secondary btn-small"
                href="{{ url_for('journalist.download_evidence', submission_id=submission.id, evidence_id=e.id) }}">Download</a>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="muted">No evidence was attached.</p>
-  {% endif %}
-</section>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="hint">
+          Images were re-encoded with all metadata (EXIF, GPS, XMP, ICC, comments)
+          removed before storage; the original upload was never saved. Open files in an
+          isolated environment all the same.
+        </p>
+      {% else %}
+        <p class="muted">No evidence was attached.</p>
+      {% endif %}
+    </section>
+  </div>
 
-<section class="panel">
-  <h2>Status</h2>
-  <p class="muted small">Workflow: Submitted &rarr; Under review &rarr; Closed.</p>
-  {% if next_statuses %}
-    <div class="action-row">
-    {% for s in next_statuses %}
-      <form method="post" action="{{ url_for('journalist.update_submission_status', submission_id=submission.id) }}"
-            class="inline-form"
-            {% if s.value == 'CLOSED' %}data-confirm="Close submission #{{ submission.id }}? Closed is final."{% endif %}>
-        {{ status_form.hidden_tag() }}
-        <input type="hidden" name="status" value="{{ s.value }}">
-        <button class="btn" type="submit">Mark as {{ s.label }}</button>
-      </form>
-    {% endfor %}
-    </div>
-  {% else %}
-    <p>This submission is closed. No further status changes are possible.</p>
-  {% endif %}
+  <aside class="stack detail-aside">
+    <section class="panel" aria-labelledby="status-heading">
+      <h2 id="status-heading">Status</h2>
+      <p class="muted small">Workflow: Submitted &rarr; Under review &rarr; Closed.</p>
+      {{ ui.status_timeline(submission.status, compact=true, audience="journalist") }}
 
-  {% if history %}
-  <h3>History</h3>
-  <table class="table">
-    <thead><tr><th>Time (UTC)</th><th>Change</th><th>By</th></tr></thead>
-    <tbody>
-    {% for e in history %}
-      <tr>
-        <td class="nowrap">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        <td>{{ e.detail }}</td>
-        <td>{{ e.actor_username or '-' }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-</section>
+      <div class="action-row status-actions">
+      {% if next_statuses %}
+        {% for s in next_statuses %}
+          <form method="post" action="{{ url_for('journalist.update_submission_status', submission_id=submission.id) }}"
+                class="inline-form"
+                {% if s.value == 'CLOSED' %}data-confirm="Close submission #{{ submission.id }}? Closed is final."{% endif %}>
+            {{ status_form.hidden_tag() }}
+            <input type="hidden" name="status" value="{{ s.value }}">
+            <button class="btn" type="submit">Mark as {{ s.label }}</button>
+          </form>
+        {% endfor %}
+      {% else %}
+        <p class="muted small">This submission is closed. No further status changes are possible.</p>
+      {% endif %}
+      </div>
+    </section>
 
-<p><a href="{{ url_for('journalist.inbox') }}">&larr; Back to inbox</a></p>
+    <section class="panel" aria-labelledby="details-heading">
+      <h2 id="details-heading">Details</h2>
+      <dl class="detail-list">
+        <dt>Received</dt><dd>{{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+        <dt>Last updated</dt><dd>{{ submission.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</dd>
+        <dt>Evidence</dt><dd>{{ submission.evidence|length }}</dd>
+      </dl>
+      <p class="hint">
+        The source is anonymous: no name, account, IP address or session is stored with
+        this report. The report and evidence are stored encrypted (AES-256-GCM) and
+        passed their HMAC-SHA-256 integrity and timestamp checks before being shown.
+      </p>
+    </section>
+
+    {% if history %}
+    <section class="panel" aria-labelledby="history-heading">
+      <h2 id="history-heading">History</h2>
+      <ol class="history">
+        {% for e in history %}
+        <li>
+          <span class="when">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }} UTC &middot; {{ e.actor_username or '-' }}</span>
+          {{ e.detail }}
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+  </aside>
+</div>
 {% endblock %}

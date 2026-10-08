@@ -1,34 +1,38 @@
 {% extends "phase2/base.html" %}
-{% block title %}Sign in{% endblock %}
+{% block title %}Staff login{% endblock %}
 
 {% block content %}
-<section class="auth-panel">
-  <h1>Sign in</h1>
-  <p class="muted">Administrators and authorized journalists only.</p>
+<div class="auth-wrap">
+  <section class="auth-card" aria-labelledby="login-heading">
+    <h1 id="login-heading">Staff login</h1>
+    <p class="lead">For journalists and administrators. You are taken to the right workspace for your role after you sign in.</p>
 
-  <form method="post" action="{{ url_for('auth.login') }}" novalidate>
-    {{ form.hidden_tag() }}
-    <input type="hidden" name="next" value="{{ next_url or '' }}">
+    <form method="post" action="{{ url_for('auth.login') }}" novalidate>
+      {{ form.hidden_tag() }}
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
 
-    <div class="field">
-      {{ form.username.label }}
-      {{ form.username(autocomplete="username", autofocus=true, required=true, maxlength=64) }}
-      {% for error in form.username.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-    </div>
+      <div class="field">
+        {{ form.username.label }}
+        {{ form.username(autocomplete="username", autofocus=true, required=true, maxlength=64,
+                         autocapitalize="none", spellcheck="false") }}
+        {% for error in form.username.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </div>
 
-    <div class="field">
-      {{ form.password.label }}
-      {{ form.password(autocomplete="current-password", required=true, maxlength=128) }}
-      {% for error in form.password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-    </div>
+      <div class="field">
+        {{ form.password.label }}
+        {{ form.password(autocomplete="current-password", required=true, maxlength=128) }}
+        {% for error in form.password.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </div>
 
-    {{ form.submit(class="btn btn-block") }}
-  </form>
+      {{ form.submit(class="btn btn-lg btn-block") }}
+    </form>
 
-  <p class="muted small">
-    No account? Journalist accounts are created by an administrator.
-    Anonymous sources do not need an account at all &mdash;
-    <a href="{{ url_for('main.home') }}">return to the home page</a>.
-  </p>
-</section>
+    <p class="auth-foot">
+      Sharing information? You do not need an account.
+      <a href="{{ url_for('source.submit') }}">Submit a report</a> or
+      <a href="{{ url_for('source.status') }}">check a status</a> anonymously.
+      Staff accounts are created by an administrator.
+    </p>
+  </section>
+</div>
 {% endblock %}

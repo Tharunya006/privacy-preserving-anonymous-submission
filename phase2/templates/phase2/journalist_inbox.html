@@ -1,55 +1,72 @@
 {% extends "phase2/base.html" %}
+{% import "phase2/_ui.html" as ui %}
 {% block title %}Inbox{% endblock %}
 
 {% block content %}
-<h1>Submission inbox</h1>
-<p class="muted">
-  Anonymous reports, newest first. Opening a report or downloading evidence is
-  recorded in the audit log.
-</p>
+<header class="page-head">
+  <h1>Submission inbox</h1>
+  <p class="lead">
+    Anonymous reports, newest first. Opening a report or downloading evidence is
+    recorded in the audit log.
+  </p>
+</header>
 
-<div class="action-row">
-  <a class="btn btn-ghost {% if not status_filter %}is-active{% endif %}"
-     href="{{ url_for('journalist.inbox') }}">All ({{ counts['TOTAL'] }})</a>
+<nav class="tabs" aria-label="Filter by status">
+  <a class="tab {% if not status_filter %}is-active{% endif %}"
+     href="{{ url_for('journalist.inbox') }}"{% if not status_filter %} aria-current="page"{% endif %}>
+    All <span class="count">{{ counts['TOTAL'] }}</span>
+  </a>
   {% for s in statuses %}
-    <a class="btn btn-ghost {% if status_filter == s.value %}is-active{% endif %}"
-       href="{{ url_for('journalist.inbox', status=s.value) }}">{{ s.label }} ({{ counts[s.value] }})</a>
+    <a class="tab {% if status_filter == s.value %}is-active{% endif %}"
+       href="{{ url_for('journalist.inbox', status=s.value) }}"{% if status_filter == s.value %} aria-current="page"{% endif %}>
+      {{ s.label }} <span class="count">{{ counts[s.value] }}</span>
+    </a>
   {% endfor %}
-</div>
+</nav>
 
-<section class="panel">
+<section class="panel panel-flush" aria-label="Submissions">
   {% if submissions %}
-  <table class="table">
-    <thead>
-      <tr><th>Ref.</th><th>Title</th><th>Status</th><th>Evidence</th><th>Received (UTC)</th><th>Updated (UTC)</th></tr>
-    </thead>
-    <tbody>
-    {% for s, title in submissions %}
-      <tr>
-        <td class="nowrap">#{{ s.id }}</td>
-        <td><a href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="field-error">integrity check failed</span>{% endif %}</a></td>
-        <td><span class="badge badge-sub-{{ s.status|lower }}">{{ s.status_label }}</span></td>
-        <td>{{ s.evidence|length }}</td>
-        <td class="nowrap">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        <td class="nowrap">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead>
+        <tr><th>Ref.</th><th>Title</th><th>Status</th><th>Evidence</th><th>Received (UTC)</th><th>Updated (UTC)</th></tr>
+      </thead>
+      <tbody>
+      {% for s, title in submissions %}
+        <tr>
+          <td class="ref" data-label="Ref.">#{{ s.id }}</td>
+          <td class="cell-main" data-label="Title">
+            <a class="title-link" href="{{ url_for('journalist.submission_detail', submission_id=s.id) }}">{% if title is not none %}{{ title }}{% else %}<span class="integrity-failed">integrity check failed</span>{% endif %}</a>
+          </td>
+          <td data-label="Status">{{ ui.sub_badge(s.status, s.status_label) }}</td>
+          <td data-label="Evidence">{{ s.evidence|length }}</td>
+          <td class="nowrap" data-label="Received">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="nowrap" data-label="Updated">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% if pagination.pages > 1 %}
   <nav class="pager" aria-label="Inbox pages">
-    {% if pagination.has_prev %}
-      <a class="btn btn-small btn-ghost" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.prev_num) }}">&larr; Newer</a>
-    {% endif %}
+    <span>
+      {% if pagination.has_prev %}
+        <a class="btn btn-secondary btn-small" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.prev_num) }}">&larr; Newer</a>
+      {% endif %}
+    </span>
     <span class="muted small">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-    {% if pagination.has_next %}
-      <a class="btn btn-small btn-ghost" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.next_num) }}">Older &rarr;</a>
-    {% endif %}
+    <span>
+      {% if pagination.has_next %}
+        <a class="btn btn-secondary btn-small" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.next_num) }}">Older &rarr;</a>
+      {% endif %}
+    </span>
   </nav>
   {% endif %}
   {% else %}
-    <p class="muted">No submissions{% if status_filter %} with this status{% endif %} yet.</p>
+    <div class="empty">
+      <strong>No submissions{% if status_filter %} with this status{% endif %} yet</strong>
+      New anonymous reports appear here as soon as they are submitted.
+    </div>
   {% endif %}
 </section>
-<p><a href="{{ url_for('journalist.dashboard') }}">&larr; Back to dashboard</a></p>
 {% endblock %}
