@@ -1,0 +1,75 @@
+{% extends "phase2/base.html" %}
+{% from "phase2/_analysis_ui.html" import state_badge, signature_badge, num %}
+{% from "phase2/_ui.html" import sub_badge %}
+{% block title %}Security analysis{% endblock %}
+
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <h1>Security analysis</h1>
+    <p class="lead">Check how well reports are encrypted. You see <strong>encrypted data only</strong>.
+      Nothing is decrypted here.</p>
+  </div>
+  <div class="action-row">
+    <a class="btn btn-secondary" href="{{ url_for('admin.analysis_hashing') }}">Hashing analysis</a>
+    <a class="btn" href="{{ url_for('admin.analysis_experiments') }}">Controlled experiments</a>
+  </div>
+</header>
+
+<div class="alert alert-info">
+  <p><strong>Two kinds of analysis.</strong> <em>Real reports</em>: tests that only need the encrypted data.
+    <a href="{{ url_for('admin.analysis_experiments') }}">Controlled experiments</a>: all text and image tests, on sample data
+    with temporary keys.</p>
+</div>
+
+<section class="panel panel-flush" aria-labelledby="records-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="records-heading">Stored reports ({{ counts['TOTAL'] }})</h2>
+      <p class="small muted">Entropy = how random the stored encrypted bytes look, in bits per byte (8 is the maximum).
+        Short texts score lower only because they are short.</p>
+    </div>
+    <span class="records-pill">{{ rows|length }} record{{ '' if rows|length == 1 else 's' }}</span>
+  </div>
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Reference</th><th>Status</th><th>Received</th><th>Text · entropy</th><th>Evidence · entropy</th><th>Signature</th><th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        {% set s = row.submission %}
+        <tr>
+          <td class="ref" data-label="Reference">{{ s.reference }}</td>
+          <td data-label="Status">{{ sub_badge(s.status, s.status_label) }}</td>
+          <td class="nowrap" data-label="Received">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td data-label="Text · entropy">
+            <span class="state-metric">{{ state_badge(row.text_state) }}
+              {%- if row.text_entropy is not none %}<span class="entropy">{{ num(row.text_entropy, 3) }}</span>{% else %}<span class="entropy muted">withheld</span>{% endif %}</span>
+          </td>
+          <td data-label="Evidence · entropy">
+            {% for state in row.evidence_states %}
+              <span class="state-metric">{{ state_badge(state) }}
+                {%- set value = row.evidence_entropy[loop.index0] %}
+                {%- if value is not none %}<span class="entropy">{{ num(value, 3) }}</span>{% else %}<span class="entropy muted">n/a</span>{% endif %}</span>
+            {% else %}<span class="muted">none</span>{% endfor %}
+          </td>
+          <td data-label="Signature">{{ signature_badge(row.signature) }}</td>
+          <td class="actions" data-label="">
+            <a class="btn btn-secondary btn-small" href="{{ url_for('admin.analysis_report', submission_id=s.id) }}">Analyse</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty"><strong>No reports yet</strong>Stored reports will be listed here.</div>
+  {% endif %}
+</section>
+
+<p class="small muted">Legacy records were stored before Phase 5 and are still plaintext. Their stored
+  values are withheld on these pages. Encrypt them with <code>flask --app app protect-legacy-data</code>.
+  Signature = the server's RSA-PSS signature over the stored encrypted report and evidence, checked with
+  the public key only. Reports accepted before signing was introduced are "Unsigned (legacy)".
+  Opening an analysis page is recorded in the audit log (page and reference only).</p>
+{% endblock %}

@@ -1,0 +1,31 @@
+{# Inline SVG icons for the staff layout.  Decorative only (aria-hidden); every
+   control keeps its visible text label.  Inline SVG with presentation
+   attributes works under the Content-Security-Policy (no inline styles). #}
+{% macro icon(name, size=18) -%}
+<svg class="icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{%- if name == "shield" -%}
+  <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>
+{%- elif name == "dashboard" -%}
+  <path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l3.5-4"/><circle cx="12" cy="15" r="1.2"/><path d="M4 19h16"/>
+{%- elif name == "users" -%}
+  <circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M17.5 14.2c1.6.6 2.7 2.2 3 4.8"/>
+{%- elif name == "user-plus" -%}
+  <circle cx="10" cy="8" r="3.2"/><path d="M4 19c.6-3.2 2.9-5 6-5 1.3 0 2.5.3 3.4.9"/><path d="M18 14v6M15 17h6"/>
+{%- elif name == "list" -%}
+  <path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".9"/><circle cx="4.5" cy="12" r=".9"/><circle cx="4.5" cy="18" r=".9"/>
+{%- elif name == "chart" -%}
+  <path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-5M12 16V8M16 16v-3M20 16V6"/>
+{%- elif name == "inbox" -%}
+  <path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/>
+{%- elif name == "user" -%}
+  <circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/>
+{%- elif name == "key" -%}
+  <circle cx="8" cy="14" r="4"/><path d="M11 11l8-8M16 6l2.5 2.5M14 8l2 2"/>
+{%- elif name == "switch" -%}
+  <path d="M7 4L3 8l4 4"/><path d="M3 8h13"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8"/>
+{%- elif name == "logout" -%}
+  <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

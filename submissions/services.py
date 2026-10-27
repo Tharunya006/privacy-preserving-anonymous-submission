@@ -28,7 +28,15 @@ from werkzeug.utils import secure_filename
 from phase2.extensions import db
 from phase2.models import AuditLog, User, record_event, utcnow
 
-from .models import STATUS_LABELS, Evidence, Submission, SubmissionStatus
+from . import signing
+from .models import (
+    STATUS_LABELS,
+    Evidence,
+    SigningSettings,
+    Submission,
+    SubmissionSignature,
+    SubmissionStatus,
+)
 from .crypto import (
     IntegrityCheckError,
     Keys,
@@ -269,6 +277,9 @@ def create_submission(
     """
     title = _clean_text(title, "Title", TITLE_MAX_LENGTH)
     content = _clean_text(content, "Report", CONTENT_MAX_LENGTH)
+    # Phase 7: refuse before anything is written if the server cannot sign.
+    if not signing_keys().can_sign:
+        raise signing.SigningUnavailable("No signing key is configured.")
 
     if evidence is not None:
         raw_extension, raw_data = evidence
@@ -308,6 +319,8 @@ def create_submission(
             detail=f"evidence={len(submission.evidence)}",
             commit=False,
         )
+        db.session.flush()            # evidence ids are part of the signed manifest
+        sign_submission(submission)   # same transaction: stored together or not at all
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -412,3 +425,107 @@ def update_status(
     db.session.commit()
     db.session.refresh(submission)
     return submission
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: server signatures over accepted submissions
+# ---------------------------------------------------------------------------
+def signing_keys() -> signing.SigningKeys:
+    return current_app.extensions["signing_keys"]
+
+
+def _manifest_for(submission: Submission, key_id: str, signed_at: datetime) -> bytes:
+    """The signed manifest, built from the STORED bytes: the text columns as
+    stored and each evidence file as stored on disk.  Raises ValueError /
+    FileNotFoundError if stored data is not in the signable form."""
+    entries = []
+    for evidence in submission.evidence:
+        path = evidence_path(evidence)
+        if path is None:
+            raise ValueError("evidence file name is not valid")
+        entries.append(signing.EvidenceEntry(
+            id=evidence.id, stored_name=evidence.stored_name, extension=evidence.extension,
+            size_bytes=evidence.size_bytes, created_at=evidence.created_at, envelope=path.read_bytes()))
+    return signing.build_manifest(
+        key_id=key_id, submission_id=submission.id, created_at=submission.created_at, signed_at=signed_at,
+        title_envelope=signing.text_envelope(submission.title_sealed),
+        content_envelope=signing.text_envelope(submission.content_sealed), evidence=entries)
+
+
+def sign_submission(submission: Submission) -> SubmissionSignature:
+    """Sign a just-accepted submission inside the caller's transaction (no commit here)."""
+    keys = signing_keys()
+    if not keys.can_sign:
+        raise signing.SigningUnavailable("No signing key is configured.")
+    signed_at = utcnow()
+    try:
+        signature = signing.sign_manifest(keys, _manifest_for(submission, keys.key_id, signed_at))
+    except (ValueError, OSError) as exc:
+        # Not a ValueError, so the route never shows it as a form error.
+        raise signing.SigningFailed("The submission could not be signed.") from exc
+    record = SubmissionSignature(
+        submission_id=submission.id, manifest_version=signing.MANIFEST_VERSION,
+        algorithm=signing.ALGORITHM, signature_format=signing.SIGNATURE_FORMAT, key_id=keys.key_id,
+        signed_at=signed_at, signature=signature)
+    db.session.add(record)
+    if db.session.get(SigningSettings, 1) is None:
+        # The first signed submission: every later one must be signed too.
+        db.session.add(SigningSettings(id=1, required_from_submission_id=submission.id))
+    return record
+
+
+SIGNATURE_STATUSES = {
+    "valid": "Valid",
+    "invalid": "Invalid",
+    "missing": "Missing signature",
+    "unknown_key": "Unknown key",
+    "legacy": "Unsigned (legacy)",
+    "malformed": "Malformed signature record",
+    "error": "Verification error",
+}
+
+
+def verify_submission_signature(submission: Submission) -> dict:
+    """Verify a submission's signature against its CURRENT stored bytes, with
+    the trusted PUBLIC key for the recorded key ID.  Nothing is decrypted and
+    the private key is not used.  Only "valid" means valid; every other
+    outcome -- including errors and unknown keys -- is reported as such."""
+    record = db.session.execute(
+        db.select(SubmissionSignature).filter_by(submission_id=submission.id)).scalar()
+    result = {"status": None, "key_id": None, "signed_at": None, "algorithm": None,
+              "manifest_version": None, "reason": None}
+    if record is None:
+        settings = db.session.get(SigningSettings, 1)
+        if settings is None or submission.id < settings.required_from_submission_id:
+            result.update(status="legacy", reason="Accepted before signing was introduced; never signed.")
+        else:
+            result.update(status="missing", reason="This report should have a signature, but none is stored.")
+        return result
+    result.update(key_id=record.key_id, signed_at=record.signed_at, algorithm=record.algorithm,
+                  manifest_version=record.manifest_version)
+    if (record.algorithm != signing.ALGORITHM or record.signature_format != signing.SIGNATURE_FORMAT
+            or record.manifest_version != signing.MANIFEST_VERSION or not record.signature):
+        result.update(status="malformed", reason="Unsupported or incomplete signature record.")
+        return result
+    public_key = signing_keys().trusted.get(record.key_id)
+    if public_key is None:
+        result.update(status="unknown_key", reason="The signing key ID is not in the trusted key set.")
+        return result
+    if len(record.signature) != public_key.key_size // 8:
+        result.update(status="malformed", reason="The signature has the wrong length for this key.")
+        return result
+    try:
+        manifest = _manifest_for(submission, record.key_id, record.signed_at)
+    except (ValueError, OSError):
+        result.update(status="invalid", reason="Signed stored data is missing or no longer in its signed form.")
+        return result
+    if signing.verify_manifest(public_key, record.signature, manifest):
+        result.update(status="valid", reason="The signed stored data is unchanged since signing.")
+    else:
+        result.update(status="invalid", reason="The stored data or the signature changed after signing.")
+    return result
+
+
+def is_signed(submission_id: int) -> bool:
+    return db.session.execute(
+        db.select(SubmissionSignature.id).filter_by(submission_id=submission_id)).first() is not None

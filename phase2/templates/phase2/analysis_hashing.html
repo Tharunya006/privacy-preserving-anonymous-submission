@@ -1,0 +1,330 @@
+{% extends "phase2/base.html" %}
+{% from "phase2/_analysis_ui.html" import num, txt, learn_more, metric, metric_head, state_badge %}
+{% from "phase2/_ui.html" import sub_badge %}
+{% block title %}Hashing analysis{% endblock %}
+
+{% macro verdict(ok) -%}
+{%- if ok -%}<span class="badge badge-encrypted">No evidence of deviation (α = 0.001)</span>
+{%- else -%}<span class="badge badge-problem">Deviation flagged</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro big(n) -%}{{ "{:,.0f}".format(n) }}{%- endmacro %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('admin.analysis_overview') }}">← Security analysis</a>
+<header class="page-head">
+  <h1>Hashing analysis</h1>
+  <p class="lead">How SHA-256 behaves, measured on <strong>synthetic messages only</strong> (fixed seed {{ seed }}).
+    No stored hash, token, HMAC, tag, key or report is read. The numbers are measured again on every page load.</p>
+</header>
+
+{% for message in errors %}
+  <div class="alert alert-warn"><p>{{ message }} The rest of the page is unaffected.</p></div>
+{% endfor %}
+
+<div class="alert alert-info">
+  <p><strong>These experiments do not prove SHA-256 is secure.</strong> Passing statistical tests only shows that no
+    simple pattern is visible in these samples, and the attack examples only work on tiny, deliberately weakened
+    versions. SHA-256's security rests on decades of public cryptanalysis, not on tests like these.</p>
+</div>
+
+{# ------------------------------------------------------------- every report #}
+<section class="panel panel-flush" aria-labelledby="reports-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="reports-heading">Per-report analysis</h2>
+      <p class="small muted">Every stored report. Each report's page analyses its <em>stored ciphertext</em> (never its content) and
+        shows how its integrity is protected. Unencrypted (legacy) items are listed but not processed.</p>
+    </div>
+    <span class="records-pill">{{ reports|length }} record{{ '' if reports|length == 1 else 's' }}</span>
+  </div>
+  {% if reports %}
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Reference</th><th>Status</th><th>Received</th><th>Stored items</th><th></th></tr></thead>
+      <tbody>
+      {% for r in reports %}
+        {% set s = r.submission %}
+        <tr>
+          <td class="ref" data-label="Reference">{{ s.reference }}</td>
+          <td data-label="Status">{{ sub_badge(s.status, s.status_label) }}</td>
+          <td class="nowrap" data-label="Received">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td data-label="Stored items">
+            {% for item in r["items"] %}<span class="state-metric"><span class="small">{{ item.label }}</span>{{ state_badge(item.state) }}</span>{% endfor %}
+          </td>
+          <td class="actions" data-label=""><a class="btn btn-secondary btn-small" href="{{ url_for('admin.analysis_report_hashing', submission_id=s.id) }}">View analysis</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty"><strong>No reports yet</strong>Stored reports will be listed here.</div>
+  {% endif %}
+</section>
+
+{# ------------------------------------------------------------- comparison #}
+<section class="panel panel-flush" aria-labelledby="compare-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="compare-heading">SHA-256, HMAC, GCM tag and digital signature</h2>
+      <p class="small muted">Four different tools. Only the first one is analysed on this page.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th>Mechanism</th><th>Secret key?</th><th>What it shows</th><th>Who can make / check it</th><th>Used in this project</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row" data-label="Mechanism">SHA-256 hash</th>
+          <td data-label="Secret key?">No</td>
+          <td data-label="What it shows">A fixed-size fingerprint: any change to the input gives a completely different digest.
+            It does <em>not</em> show who made it.</td>
+          <td data-label="Who">Anyone</td>
+          <td data-label="Used here">Submission tokens are stored only as their SHA-256 digest; SHA-256 is also the building block of HMAC and of password hashing (PBKDF2-HMAC-SHA-256).</td>
+        </tr>
+        <tr>
+          <th scope="row" data-label="Mechanism">HMAC-SHA-256</th>
+          <td data-label="Secret key?">Yes (HMAC key)</td>
+          <td data-label="What it shows">Integrity <em>and</em> authenticity: only someone with the key could have produced it.</td>
+          <td data-label="Who">Only holders of the key (the server)</td>
+          <td data-label="Used here">Every stored report and evidence package; checked first, before any decryption.</td>
+        </tr>
+        <tr>
+          <th scope="row" data-label="Mechanism">AES-GCM authentication tag</th>
+          <td data-label="Secret key?">Yes (encryption key)</td>
+          <td data-label="What it shows">The ciphertext and its associated data were not changed. Computed with GHASH, not SHA-256; 128 bits.</td>
+          <td data-label="Who">Only holders of the encryption key</td>
+          <td data-label="Used here">Every encrypted package; checked again during decryption.</td>
+        </tr>
+        <tr>
+          <th scope="row" data-label="Mechanism">Digital signature (e.g. Ed25519, RSA-PSS)</th>
+          <td data-label="Secret key?">Private key signs; public key verifies</td>
+          <td data-label="What it shows">Origin that anyone can check, and that the signer cannot later deny.</td>
+          <td data-label="Who">Signed by the private-key holder; verified by anyone with the public key</td>
+          <td data-label="Used here"><strong>Not used</strong> in this project.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ------------------------------------------------------------- correlation #}
+{% if sac %}
+<section class="panel" aria-labelledby="sac-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="sac-heading">Hash correlation (strict avalanche criterion)</h2>
+      <p class="small muted">{{ sac.messages }} random synthetic messages of {{ sac.message_bytes }} bytes; {{ sac.input_bits }} input bits flipped in each
+        ({{ big(sac.trials) }} flips). Each result is compared with an ideal random function.</p>
+    </div>
+    {{ verdict(sac.consistent) }}
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack metric-table">
+      {{ metric_head() }}
+      <tbody>
+      {% call metric("Output-bit flip rate",
+          "When 1 input bit changes, each output bit should flip half the time. Ideal: 0.5.",
+          "Flip one input bit, hash both messages, and count how often each of the 256 output bits differs. The mean over all flips and all output bits is shown with its z-score (standard error √(0.25 / " ~ big(sac.trials * sac.output_bits) ~ ")).",
+          "|z| below 3 means the difference from 0.5 is within normal sampling noise.", source="synthetic") %}
+        <span class="result-value">{{ num(sac.mean_flip_rate, 5) }}</span>
+        <span class="result-sub">z = {{ txt(sac.z_mean, 2) }} · per-bit range {{ txt(sac.min_rate, 3) }}–{{ txt(sac.max_rate, 3) }}</span>
+      {% endcall %}
+      {% call metric("Largest per-bit deviation",
+          "No single output bit should favour flipping or staying the same.",
+          "The largest |flip rate − 0.5| over the 256 output bits, compared with the largest deviation expected from sampling alone: standard error × √(2 ln 512) = " ~ txt(sac.expected_max_deviation, 4) ~ ".",
+          "Each output bit is estimated from " ~ big(sac.trials) ~ " flips (standard error " ~ txt(sac.per_bit_se, 4) ~ ").", source="synthetic") %}
+        <span class="result-value">{{ num(sac.max_deviation, 4) }}</span>
+        <span class="result-sub">expected up to about {{ txt(sac.expected_max_deviation, 4) }}</span>
+      {% endcall %}
+      {% call metric("χ² test of the flip counts",
+          "Checks all 256 output bits together. A p-value above 0.001 means no evidence of bias.",
+          "χ² = Σ (flips − n/2)² / (n/2) + (stays − n/2)² / (n/2) over the 256 output bits, with 256 degrees of freedom; p-value from the Wilson–Hilferty approximation.",
+          "", source="synthetic") %}
+        χ² = <span class="result-value">{{ num(sac.chi_square, 1) }}</span>
+        <span class="result-sub">df {{ sac.chi_square_df }} · p = {{ txt(sac.chi_square_p, 3) }}</span>
+      {% endcall %}
+      {% call metric("Digest correlation (φ)",
+          "Digests of two messages that differ by 1 bit should be unrelated. Ideal: 0.",
+          "Phi coefficient (Pearson correlation of 0/1 values) between the bits of the two digests, pooled over all flips; standard error 1/√(bit pairs) = " ~ txt(sac.phi_se, 5) ~ ".",
+          "", source="synthetic") %}
+        <span class="result-value">{{ num(sac.phi, 5) }}</span>
+        <span class="result-sub">z = {{ txt(sac.phi_z, 2) }}</span>
+      {% endcall %}
+      {% call metric("Output-bit independence (variance test)",
+          "Output bits should not flip together. Ideal: Hamming-distance variance 64.",
+          "If output bits were linked, the number of changed bits would spread more (or less) than for 256 independent coin flips. Test: (flips − 1) · s² / 64 against χ² with flips − 1 degrees of freedom, two-sided.",
+          "A function whose output repeats half of itself has a perfect average flip rate but fails this test; the project's tests check that.", source="synthetic") %}
+        <span class="result-value">{{ num(sac.hd_variance, 1) }}</span>
+        <span class="result-sub">p = {{ txt(sac.variance_p, 3) }}</span>
+      {% endcall %}
+      {% call metric("Hamming distance between digests",
+          "How many of the 256 output bits change. Ideal: 128 on average, spread 8 (a fair coin per bit).",
+          "Count the differing bits for every flip. For an ideal 256-bit hash this follows Binomial(256, ½): mean 128, standard deviation 8.",
+          "", source="synthetic") %}
+        <span class="result-value">{{ num(sac.distance.mean, 2) }}</span> <span class="unit">bits</span>
+        <span class="result-sub">SD {{ txt(sac.distance.sd, 2) }} (ideal 8) · range {{ sac.distance.min }}–{{ sac.distance.max }} · z = {{ txt(sac.distance.z_mean, 2) }}</span>
+      {% endcall %}
+      </tbody>
+    </table>
+  </div>
+  {% call learn_more("Why these tests, and what they cannot show") %}
+    <p><strong>Model and assumptions.</strong> An ideal hash behaves like a random function: the digest of every different input is an
+      independent random 256-bit string, so changing any input bit flips every output bit with probability ½, independently. Four
+      consequences are tested — balance (flip rate), each output bit (χ²), independence between output bits (variance test) and relation
+      between the two digests (φ) — each at α = 0.001. With many output bits some deviation is always expected by chance, so each value is
+      compared with its sampling error rather than with an exact target. Four tests mean about a 0.4 % chance of a false alarm per run.</p>
+    <p><strong>Reading the result.</strong> "No evidence of deviation" means no test rejected. It is not proof of security, and p-values
+      are not probabilities that SHA-256 is secure.</p>
+    <p>A weak function (for example one that just copies part of its input) fails these tests badly; the project's
+      tests check that. SHA-256 passing them is necessary but nowhere near sufficient for security.</p>
+  {% endcall %}
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- modified messages #}
+{% if modifications %}
+<section class="panel panel-flush" aria-labelledby="mods-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="mods-heading">Digest bit difference for modified messages</h2>
+      <p class="small muted">Synthetic sentences such as "Report 1234: payment of 5678 to account …", each changed in one small way.
+        Ideal: 128 bits differ on average (SD 8), and φ ≈ 0.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th>Change made</th><th>Pairs</th><th>Mean bits changed</th><th>SD</th><th>Range</th><th>φ (z)</th></tr></thead>
+      <tbody>
+      {% for r in modifications %}
+        <tr>
+          <th scope="row" data-label="Change made">{{ r.modification }}</th>
+          <td data-label="Pairs">{{ big(r.pairs) }}</td>
+          <td class="num" data-label="Mean bits changed"><strong>{{ num(r.mean, 2) }}</strong> <span class="muted small">(z {{ txt(r.z_mean, 2) }})</span></td>
+          <td class="num" data-label="SD">{{ num(r.sd, 2) }}</td>
+          <td class="num" data-label="Range">{{ r.min }}–{{ r.max }}</td>
+          <td class="num" data-label="φ (z)">{{ num(r.phi, 4) }} <span class="muted small">({{ txt(r.phi_z, 2) }})</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- preimage toys #}
+{% macro toy_table(result, kind) -%}
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead><tr><th>Toy hash</th><th>Searches</th><th>Mean attempts</th><th>Expected (2ᵗ)</th><th>Within expected range?</th></tr></thead>
+    <tbody>
+    {% for r in result.rows %}
+      <tr>
+        <th scope="row" data-label="Toy hash">SHA-256 truncated to {{ r.bits }} bits</th>
+        <td data-label="Searches">{{ r.found }}/{{ r.trials }} found</td>
+        <td class="num" data-label="Mean attempts"><strong>{{ big(r.mean_attempts) if r.mean_attempts is not none else "n/a" }}</strong>
+          <span class="muted small">± {{ big(r.standard_error) if r.standard_error is not none else "n/a" }}</span></td>
+        <td class="num" data-label="Expected (2ᵗ)">{{ big(r.expected_attempts) }}</td>
+        <td data-label="Within expected range?">{% if r.within_expected %}<span class="badge badge-encrypted">yes (z {{ txt(r.z, 2) }})</span>{% else %}<span class="badge badge-problem">no (z {{ txt(r.z, 2) }})</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+      <tr class="row-synthetic">
+        <th scope="row" data-label="Toy hash">Full SHA-256 (256 bits)</th>
+        <td data-label="Searches">not attempted</td>
+        <td class="num" data-label="Mean attempts">—</td>
+        <td class="num" data-label="Expected (2ᵗ)">2²⁵⁶ ≈ 1.2 × 10⁷⁷</td>
+        <td data-label="Within expected range?">≈ 10<sup>{{ txt(result.full_log10_years, 0) }}</sup> years at this server's speed;
+          ≈ 10<sup>{{ txt(result.full_log10_years_trillion_x, 0) }}</sup> years on a machine a trillion times faster</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<p class="small muted panel-note">{{ big(result.hashes) }} hashes in {{ txt(result.seconds, 2) }} s
+  (≈ {{ big(result.hashes_per_second) }} hashes/s, Python on this server). ± is the standard error of the mean
+  (search costs vary a lot, so each size is repeated).</p>
+{%- endmacro %}
+
+{% if preimage %}
+<section class="panel panel-flush" aria-labelledby="pre-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="pre-heading">Preimage resistance — bounded toy example</h2>
+      <p class="small muted"><span class="src src-synthetic">Toy: truncated SHA-256</span>
+        Given only the first t bits of the digest of a secret synthetic message, try candidate messages until one has the
+        same first t bits. For an ideal t-bit hash this takes about 2ᵗ attempts, so every extra bit doubles the work.</p>
+    </div>
+  </div>
+  {{ toy_table(preimage, "preimage") }}
+  {% set ex = preimage.rows[0].example %}
+  {% if ex %}
+  <div class="panel-note">
+    {% call learn_more("Example (8-bit toy)") %}
+      <p>Target (first 8 bits): <code>{{ ex.target }}</code>. Found message (hex): <code>{{ ex.found }}</code>.</p>
+      <p>Its full digest <code>{{ ex.found_digest }}</code> differs from the secret message's full digest
+        <code>{{ ex.secret_digest }}</code>: the toy only matched the first 8 bits, and found
+        {{ "the secret itself" if ex.same_message else "a different message" }}.</p>
+    {% endcall %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if second_preimage %}
+<section class="panel panel-flush" aria-labelledby="second-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="second-heading">Second-preimage resistance — bounded toy example</h2>
+      <p class="small muted"><span class="src src-synthetic">Toy: truncated SHA-256</span>
+        Given a synthetic message m₁, find a <em>different</em> message m₂ whose first t digest bits match those of m₁.
+        Ideal cost: also about 2ᵗ attempts.</p>
+    </div>
+  </div>
+  {{ toy_table(second_preimage, "second") }}
+  {% set ex = second_preimage.rows[0].example %}
+  {% if ex %}
+  <div class="panel-note">
+    {% call learn_more("Example (8-bit toy)") %}
+      <p>m₁: <code>{{ ex.m1 }}</code><br>m₂: <code>{{ ex.m2 }}</code><br>Shared first 8 bits: <code>{{ ex.truncated }}</code></p>
+      <p>Full digests still differ completely: <code>{{ ex.full_m1 }}</code> vs <code>{{ ex.full_m2 }}</code>.</p>
+    {% endcall %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- restricted candidate space #}
+{% if restricted %}
+<section class="panel" aria-labelledby="space-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="space-heading">Restricted candidate space</h2>
+      <p class="small muted"><span class="src src-synthetic">Synthetic PIN</span>
+        Full SHA-256, but of a 4-digit PIN: there are only {{ big(restricted.candidates) }} possible inputs.</p>
+    </div>
+    {% if restricted.correct %}<span class="badge badge-problem">PIN recovered</span>{% endif %}
+  </div>
+  <p>Trying every PIN recovered it after <strong>{{ big(restricted.attempts) }}</strong> attempts in
+    <strong>{{ txt(restricted.milliseconds, 1) }} ms</strong>. Preimage resistance cannot protect an input that can simply be guessed.</p>
+  <p>This is why the app's submission tokens are <strong>{{ restricted.token_bits }}-bit random values</strong>
+    (about 10<sup>{{ txt(restricted.token_log10_candidates, 0) }}</sup> possibilities): guessing one by trying digests would take
+    about 10<sup>{{ txt(restricted.token_log10_years, 0) }}</sup> years at this server's speed. Passwords are handled differently: a salted,
+    deliberately slow PBKDF2 hash.</p>
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- limitations #}
+<section class="panel" aria-labelledby="limits-heading">
+  <h2 id="limits-heading">Limitations</h2>
+  <ul class="check-list">
+    <li>Statistical tests can reveal obvious bias; passing them does not prove a hash is secure.</li>
+    <li>Sample sizes are small (thousands of hashes); real cryptanalysis studies far more and uses mathematical analysis.</li>
+    <li>The preimage and second-preimage examples attack SHA-256 <em>truncated</em> to 8–16 bits. They show how the cost of a
+      generic brute-force search grows (2ᵗ), not that full SHA-256 cannot be broken by some other method.</li>
+    <li>The 256-bit estimate assumes brute force on classical computers; Grover's algorithm on a large quantum computer would
+      need about 2¹²⁸ steps instead, which is still far out of reach.</li>
+    <li>Collision resistance (any two messages with the same digest, cost about 2¹²⁸) is a different property and is not tested here.</li>
+    <li>Messages come from a fixed-seed generator, so the page is reproducible; it uses no real report, token or key.</li>
+  </ul>
+</section>
+{% endblock %}

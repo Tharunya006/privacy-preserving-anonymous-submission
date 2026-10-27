@@ -1,9 +1,11 @@
 {% extends "phase2/base.html" %}
+{% from "phase2/_icons.html" import icon %}
 {% block title %}Staff login{% endblock %}
 
 {% block content %}
 <div class="auth-wrap">
   <section class="auth-card" aria-labelledby="login-heading">
+    <span class="auth-mark">{{ icon("shield", 28) }}</span>
     <h1 id="login-heading">Staff login</h1>
     <p class="lead">For journalists and administrators. You are taken to the right workspace for your role after you sign in.</p>
 
@@ -26,6 +28,13 @@
 
       {{ form.submit(class="btn btn-lg btn-block") }}
     </form>
+
+    {#- Information only: the workspace comes from the account's role on the
+        server.  Nothing here selects or grants a role. -#}
+    <ul class="role-info" aria-label="Staff workspaces">
+      <li><strong>Admin</strong><span>Journalist accounts, audit log, security analysis</span></li>
+      <li><strong>Journalist</strong><span>Read and review anonymous reports</span></li>
+    </ul>
 
     <p class="auth-foot">
       Sharing information? You do not need an account.

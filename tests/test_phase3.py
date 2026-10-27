@@ -21,7 +21,7 @@ from PIL import Image, ImageCms, PngImagePlugin
 from phase2.extensions import db
 from phase2.models import AuditLog
 from submissions import InMemoryUploadRequest, scrubber
-from submissions.models import Evidence, Submission
+from submissions.models import Evidence, Submission, SubmissionSignature
 from submissions.scrubber import (
     ScrubError,
     assert_image_is_clean,
@@ -421,6 +421,8 @@ class TestScrubEvidenceCommand:
     def _legacy(self, app, extension: str, data: bytes) -> Evidence:
         """Store a file the way the pre-Phase-3 code did: as uploaded."""
         submission, _ = create_submission("legacy", "body")
+        # Reports stored before Phase 7 were never signed.
+        db.session.execute(db.delete(SubmissionSignature).filter_by(submission_id=submission.id))
         directory = Path(app.config["EVIDENCE_DIR"])
         directory.mkdir(parents=True, exist_ok=True)
         name = f"{os.urandom(16).hex()}.{extension}"

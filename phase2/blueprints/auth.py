@@ -6,6 +6,8 @@ an admin, and the first admin is created by the CLI bootstrap command.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from flask import (
     Blueprint,
     current_app,
@@ -40,6 +42,17 @@ GENERIC_LOGIN_ERROR = "Invalid username or password."
 
 def _client_ip() -> str | None:
     return request.headers.get("X-Forwarded-For", request.remote_addr)
+
+
+def _next_is_for_role(user: User, next_url: str) -> bool:
+    """Follow ``next`` only inside the user's own area, so an admin is never
+    sent to a journalist page (or vice versa) just to be refused there.  This
+    only chooses where to go; access is still checked by every route."""
+    if not is_safe_redirect_target(next_url):
+        return False
+    other_area = "/journalist" if user.is_admin else "/admin"
+    path = urlsplit(next_url).path
+    return not (path == other_area or path.startswith(other_area + "/"))
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -105,7 +118,7 @@ def login():
 
         if user.must_change_password:
             return redirect(url_for("auth.change_password"))
-        if is_safe_redirect_target(next_url):
+        if _next_is_for_role(user, next_url):
             return redirect(next_url)
         return redirect(url_for(dashboard_endpoint_for(user)))
 
@@ -128,7 +141,11 @@ def logout():
     user = g.current_user
     record_event("logout", actor=user, target=user.username, ip_address=_client_ip())
     logout_user()
-    flash("You have been signed out.", "success")
+    if request.form.get("switch") == "1":
+        # "Switch account": the same logout, then the login page for the next user.
+        flash("You have been signed out. Sign in with another account.", "success")
+    else:
+        flash("You have been signed out.", "success")
     return redirect(url_for("auth.login"))
 
 

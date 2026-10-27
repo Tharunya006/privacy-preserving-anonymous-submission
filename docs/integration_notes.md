@@ -91,7 +91,7 @@ anonymous source ── /submit, /status ──► submissions.routes ──► 
                                                                                        ├─► db (instance/phase2.db)
 journalist ── /auth/login ──► Phase 2 session ── /journalist/* ──► journalist bp ─────┤
                                    (@journalist_required, re-checked every request)    │
-admin ── /admin/* (@admin_required) — accounts, audit log, submission COUNTS only ─────┘
+admin ── /admin/* (@admin_required) — accounts, audit log, counts, CIPHERTEXT analysis ─┘
 ```
 
 ---
@@ -147,9 +147,10 @@ Phase 2's system is the only one:
 |---|---|---|
 | Anonymous source | **none** | `/`, `/submit`, `/status` |
 | Journalist (AUTHORIZED) | yes | `/journalist/*` — inbox, reports, evidence, status updates |
-| Admin | yes (CLI bootstrap) | `/admin/*` — accounts, audit log, submission counts |
+| Admin | yes (CLI bootstrap) | `/admin/*` — accounts, audit log, submission counts, ciphertext-only security analysis |
 
-* Admins do **not** read report content. Roles are exclusive, so an admin gets
+* Admins do **not** read report content. The security-analysis pages show
+  stored ciphertext only and never decrypt (see `security_analysis.md`). Roles are exclusive, so an admin gets
   403 on `/journalist/*`.
 * PBKDF2 password hashing, lockout, idle timeout, session-fixation defence,
   CSRF, security headers and the audit log apply to the whole app unchanged.
@@ -171,6 +172,7 @@ Phase 2's system is the only one:
 | GET | `/journalist/submissions/<id>` | JOURNALIST + AUTHORIZED — audited `submission.viewed` |
 | POST | `/journalist/submissions/<id>/status` | JOURNALIST + AUTHORIZED, CSRF — one step of Submitted → Under review → Closed, audited |
 | GET | `/journalist/submissions/<id>/evidence/<eid>` | JOURNALIST + AUTHORIZED — audited, attachment only |
+| GET | `/admin/security-analysis[/submissions/<id>[/evidence/<eid>/cipher.png]]`, `/admin/security-analysis/experiments` | ADMIN — ciphertext only, audited `analysis.viewed` (see `security_analysis.md`) |
 
 Removed: Phase 1's `/test-db` and `/test-submissions` debug routes (the latter
 published every submission to anyone).

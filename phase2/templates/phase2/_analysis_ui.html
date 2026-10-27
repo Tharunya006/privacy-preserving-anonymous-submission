@@ -1,0 +1,154 @@
+{# Presentation macros for the security-analysis pages.  Display only.
+   Charts are inline SVG with presentation attributes, and "Learn more" uses
+   <details> (no inline styles, no scripts), so everything works under the
+   existing Content-Security-Policy. #}
+
+{# A number for display: None -> "n/a", infinity -> "∞". #}
+{% macro num(value, digits=3, unit="") -%}
+{%- if value is none -%}<span class="muted">n/a</span>
+{%- elif value > 1e308 -%}∞{% if unit %} {{ unit }}{% endif %}
+{%- else -%}{{ ("%." ~ digits ~ "f")|format(value) }}{% if unit %} {{ unit }}{% endif %}
+{%- endif -%}
+{%- endmacro %}
+
+{# Same as num(), but plain text (for use inside longer sentences). #}
+{% macro txt(value, digits=3) -%}
+{%- if value is none -%}n/a{%- elif value > 1e308 -%}∞{%- else -%}{{ ("%." ~ digits ~ "f")|format(value) }}{%- endif -%}
+{%- endmacro %}
+
+{# Where a value comes from: this report's stored ciphertext, or a controlled
+   experiment on synthetic data with temporary keys (never this report). #}
+{% macro source_badge(source) -%}
+{%- if source == "report" -%}<span class="src src-report">This report</span>
+{%- elif source == "synthetic" -%}<span class="src src-synthetic">Synthetic experiment</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro size(n) -%}
+{%- if n is none -%}<span class="muted">n/a</span>
+{%- elif n >= 1000000 -%}{{ "%.2f"|format(n / 1000000) }} MB
+{%- elif n >= 1000 -%}{{ "%.1f"|format(n / 1000) }} KB
+{%- else -%}{{ n }} B{%- endif -%}
+{%- endmacro %}
+
+{# Byte-value histogram (64 buckets of 4 byte values). #}
+{% macro histogram(bars, label, variant="cipher") -%}
+{% set peak = (bars|max) or 1 %}
+<figure class="chart">
+  <svg class="chart-svg chart-{{ variant }}" viewBox="0 0 320 84" role="img" aria-label="{{ label }} histogram, byte values 0 to 255">
+    <line class="chart-axis" x1="0" y1="80.5" x2="320" y2="80.5"></line>
+    {% for v in bars %}
+      {% set h = (v / peak * 76)|round(2) %}
+      <rect class="chart-bar" x="{{ loop.index0 * 5 }}" y="{{ 80 - h }}" width="4" height="{{ h }}"></rect>
+    {% endfor %}
+  </svg>
+  <figcaption>{{ label }}</figcaption>
+</figure>
+{%- endmacro %}
+
+{# Expandable details: methodology, formulas, extra numbers. #}
+{% macro learn_more(summary="Learn more") -%}
+<details class="learn-more">
+  <summary>{{ summary }}</summary>
+  <div class="learn-more-body">{{ caller() }}</div>
+</details>
+{%- endmacro %}
+
+{# One metric row: name | result (caller) | one-line meaning + "Learn more". #}
+{% macro metric(name, means, method, detail="", source=none) -%}
+<tr{% if source == "synthetic" %} class="row-synthetic"{% endif %}>
+  <th scope="row" data-label="Metric">{{ name }}{% if source %}<br>{{ source_badge(source) }}{% endif %}</th>
+  <td data-label="Result" class="metric-result">{{ caller() }}</td>
+  <td data-label="What it means" class="metric-notes">
+    <p>{{ means }}</p>
+    {% call learn_more() %}
+      <p><strong>How it is measured:</strong> {{ method }}</p>
+      {% if detail %}<p>{{ detail }}</p>{% endif %}
+    {% endcall %}
+  </td>
+</tr>
+{%- endmacro %}
+
+{% macro metric_head() -%}
+<thead><tr><th>Metric</th><th>Result</th><th>What it means</th></tr></thead>
+{%- endmacro %}
+
+{% macro not_applicable(name, reason) -%}
+<tr class="row-na">
+  <th scope="row" data-label="Metric">{{ name }}</th>
+  <td data-label="Result" class="metric-result"><span class="badge badge-na">Not applicable</span></td>
+  <td data-label="What it means" class="metric-notes muted">
+    <p>{{ reason }} <a href="{{ url_for('admin.analysis_experiments') }}">See the test version.</a></p>
+  </td>
+</tr>
+{%- endmacro %}
+
+{# A metric whose calculation raised an error: say so, never show a stand-in number. #}
+{% macro metric_failed(name) -%}
+<tr>
+  <th scope="row" data-label="Metric">{{ name }}</th>
+  <td data-label="Result" class="metric-result"><span class="badge badge-problem">Could not be computed</span></td>
+  <td data-label="What it means" class="metric-notes muted"><p>The calculation failed on this page load (see the notice at the top). No value is shown rather than a made-up one.</p></td>
+</tr>
+{%- endmacro %}
+
+{% macro state_badge(state) -%}
+{%- if state == "encrypted" -%}<span class="badge badge-encrypted">Encrypted</span>
+{%- elif state == "legacy" -%}<span class="badge badge-legacy">Legacy (unencrypted)</span>
+{%- elif state == "missing" -%}<span class="badge badge-problem">File missing</span>
+{%- elif state == "malformed" -%}<span class="badge badge-problem">Malformed</span>
+{%- else -%}<span class="badge badge-problem">Analysis error</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro signature_badge(sig) -%}
+{%- if sig.status == "valid" -%}<span class="badge badge-encrypted">{{ sig.label }}</span>
+{%- elif sig.status == "legacy" -%}<span class="badge badge-legacy">{{ sig.label }}</span>
+{%- else -%}<span class="badge badge-problem">{{ sig.label }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro disclaimer() -%}
+<div class="alert alert-info">
+  <p><strong>Statistics do not prove security.</strong> Good numbers only show that the encrypted data
+    has no visible pattern. The real protection comes from AES-256-GCM, HMAC-SHA-256 and keeping the keys secret.</p>
+</div>
+{%- endmacro %}
+
+{# Encryption / decryption timing table (shared by both pages). #}
+{% macro performance_table(rows, show_package=false) -%}
+<div class="table-wrap">
+  <table class="table table-stack perf-table">
+    <thead><tr>
+      <th>Data</th><th>Size</th>
+      <th>Encrypt time<br><span class="unit">ms</span></th><th>Decrypt time<br><span class="unit">ms</span></th>
+      <th>Encrypt speed<br><span class="unit">MB/s</span></th><th>Decrypt speed<br><span class="unit">MB/s</span></th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td data-label="Data">{{ r.label }}</td>
+        <td class="nowrap" data-label="Size">{{ size(r.bytes) }}</td>
+        <td class="num" data-label="Encrypt time (ms)">{{ num(r.encrypt_ms, 3) }}</td>
+        <td class="num" data-label="Decrypt time (ms)">{{ num(r.decrypt_ms, 3) }}</td>
+        <td class="num" data-label="Encrypt speed (MB/s)">{{ num(r.encrypt_mb_s, 1) }}</td>
+        <td class="num" data-label="Decrypt speed (MB/s)">{{ num(r.decrypt_mb_s, 1) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="panel-note">
+  {% call learn_more() %}
+    <p>Random data of each size is encrypted and decrypted with the same code the app uses
+      (AES-256-GCM + HMAC-SHA-256 + timestamp check), using <strong>temporary keys</strong>. No real report is decrypted.
+      "Decrypt" includes the HMAC and timestamp checks. Each time is the median of several runs.
+      Speed = size ÷ time (1 MB/s = 10⁶ bytes per second). Results depend on this computer and its load.</p>
+    <ul class="small">
+    {% for r in rows %}
+      <li>{{ r.label }}: median of {{ r.runs }} runs{% if show_package %}; stored encrypted size {{ size(r.package_bytes) }} (+71 bytes){% endif %}</li>
+    {% endfor %}
+    </ul>
+  {% endcall %}
+</div>
+{%- endmacro %}

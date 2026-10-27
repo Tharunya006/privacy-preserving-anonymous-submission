@@ -197,7 +197,9 @@ class TestSchema:
         assert User.__tablename__ == "phase2_users"
         assert AuditLog.__tablename__ == "phase2_audit_log"
         names = set(db.metadata.tables)
-        phase1_tables = {"submissions", "submission_evidence"}
+        phase1_tables = {"submissions", "submission_evidence",
+                         # Phase 7 signatures live in the submissions package too.
+                         "submission_signatures", "signing_settings"}
         assert {"phase2_users", "phase2_audit_log"} <= names
         assert phase1_tables <= names
         assert all(name.startswith("phase2_") for name in names - phase1_tables)

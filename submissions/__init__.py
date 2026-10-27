@@ -44,7 +44,8 @@ def register_submissions(app: Flask) -> Flask:
     the only safe option.
     """
     from . import models  # noqa: F401  -- registers the tables on the shared metadata
-    from .cli import protect_legacy_data_command, scrub_evidence_command
+    from .cli import (generate_signing_key_command, protect_legacy_data_command,
+                      scrub_evidence_command, verify_signatures_command)
     from .crypto import KeyConfigurationError, load_keys
     from .routes import bp
 
@@ -60,8 +61,30 @@ def register_submissions(app: Flask) -> Flask:
     app.config.pop("PHASE5_HMAC_KEY", None)
     app.extensions["phase5_keys"] = keys
 
+    # Phase 7: the server signing key.  Not configured -> the app starts, but new
+    # submissions are refused (never stored unsigned).  Configured but unusable
+    # -> refuse to start.  Never generated automatically outside tests.
+    from .signing import SigningConfigurationError, ephemeral_test_keys, load_signing_keys
+
+    if app.testing and app.config.get("PHASE7_SIGNING_EPHEMERAL_TEST_KEY"):
+        signing_keys = ephemeral_test_keys()
+    else:
+        try:
+            signing_keys = load_signing_keys(app.config.get("PHASE7_SIGNING_KEY_FILE"),
+                                             app.config.get("PHASE7_SIGNING_KEY_PASSPHRASE"),
+                                             app.config.get("PHASE7_TRUSTED_PUBLIC_KEY_DIR"))
+        except SigningConfigurationError as exc:
+            raise RuntimeError(f"Signing key configuration error: {exc} Refusing to start.") from exc
+        if not signing_keys.can_sign:
+            app.logger.warning("No signing key configured (PHASE7_SIGNING_KEY_FILE): new submissions "
+                               "will be refused until one is set up with `flask generate-signing-key`.")
+    app.config.pop("PHASE7_SIGNING_KEY_PASSPHRASE", None)
+    app.extensions["signing_keys"] = signing_keys
+
     app.request_class = InMemoryUploadRequest
     app.register_blueprint(bp)
     app.cli.add_command(scrub_evidence_command)
     app.cli.add_command(protect_legacy_data_command)
+    app.cli.add_command(generate_signing_key_command)
+    app.cli.add_command(verify_signatures_command)
     return app

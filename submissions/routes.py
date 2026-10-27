@@ -7,11 +7,12 @@ report text cannot inject markup.
 
 from __future__ import annotations
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, redirect, render_template, request, url_for
 from phase2.models import record_event
 from phase2.socket_events import notify_new_submission
 
 from .forms import StatusLookupForm, SubmissionForm
+from .signing import SigningFailed, SigningUnavailable
 from .services import (
     EvidenceError,
     ProtectionError,
@@ -35,6 +36,11 @@ def submit():
             submission, token = create_submission(
                 form.title.data, form.content.data, evidence
             )
+        except (SigningUnavailable, SigningFailed):
+            # Phase 7: every accepted report must be signed.  Nothing was
+            # stored; the reason is logged server-side, not shown.
+            current_app.logger.warning("Submission refused: server signing is unavailable.")
+            return render_template("submissions/submit.html", form=form, unavailable=True), 503
         except EvidenceError as exc:
             form.evidence.errors = list(form.evidence.errors) + [str(exc)]
             return render_template("submissions/submit.html", form=form), 400

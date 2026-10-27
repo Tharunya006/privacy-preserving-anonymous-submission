@@ -31,14 +31,18 @@
   {% endwith %}
 {%- endmacro -%}
 
-{%- macro nav_item(endpoint, label, current, also=()) -%}
+{%- from "phase2/_icons.html" import icon -%}
+
+{%- macro nav_item(endpoint, label, current, also=(), icon_name=none) -%}
   {%- set active = current == endpoint or current in also -%}
-  <a class="nav-item{% if active %} is-active{% endif %}" href="{{ url_for(endpoint) }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+  <a class="nav-item{% if active %} is-active{% endif %}" href="{{ url_for(endpoint) }}"{% if active %} aria-current="page"{% endif %}>
+    {%- if icon_name %}<span class="nav-label">{{ icon(icon_name) }}<span>{{ label }}</span></span>{% else %}{{ label }}{% endif -%}
+  </a>
 {%- endmacro -%}
 
 {%- macro brand(href, sub) -%}
   <a class="brand" href="{{ href }}">
-    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-shield">{{ icon("shield", 26) }}</span>
     <span class="brand-text">
       <span class="brand-name">PPASS</span>
       <span class="brand-sub">{{ sub }}</span>
@@ -46,45 +50,78 @@
   </a>
 {%- endmacro -%}
 
-<body class="{{ 'layout-staff' if staff_layout else 'layout-public' }}"
+<body class="{{ 'layout-staff' if staff_layout else 'layout-public' }}{{ ' page-login' if ep == 'auth.login' else '' }}"
       {%- if realtime %} data-realtime="on" data-inbox-url="{{ url_for('journalist.inbox') }}"{% endif %}>
 <a class="skip-link" href="#main">Skip to content</a>
 
 {% if staff_layout %}
+{#- Navigation is presentation only: what a role may open is enforced on the
+    server for every request, never by which links are shown here. -#}
+{%- if u.is_admin -%}
+  {%- set nav_sections = [
+    ("Overview", [("admin.dashboard", "Dashboard", [], "dashboard")]),
+    ("Management", [("admin.manage_journalists", "Journalists", ["admin.journalist_detail"], "users"),
+                    ("admin.add_journalist", "Add journalist", [], "user-plus")]),
+    ("Security", [("admin.audit_log", "Audit log", [], "list"),
+                  ("admin.analysis_overview", "Security analysis", ["admin.analysis_report", "admin.analysis_experiments", "admin.analysis_hashing", "admin.analysis_report_hashing"], "chart")]),
+  ] -%}
+{%- else -%}
+  {%- set nav_sections = [
+    ("Workspace", [("journalist.dashboard", "Dashboard", [], "dashboard"),
+                   ("journalist.inbox", "Inbox", ["journalist.submission_detail"], "inbox"),
+                   ("journalist.profile", "My profile", [], "user")]),
+  ] -%}
+{%- endif -%}
+{%- set nav_sections = nav_sections + [("Account", [("auth.change_password", "Change password", [], "key")])] -%}
+{%- set ns = namespace(section=none) -%}
+{%- for _heading, items in nav_sections -%}{%- for endpoint, label, also, _icon in items -%}
+  {%- if ep == endpoint or ep in also %}{% set ns.section = label %}{% endif -%}
+{%- endfor -%}{%- endfor -%}
 <div class="app-shell">
   <aside class="sidebar" aria-label="Staff navigation">
-    {{ brand(url_for('main.dashboard_redirect'), 'Staff workspace') }}
+    <a class="brand staff-brand" href="{{ url_for('main.dashboard_redirect') }}">
+      <span class="staff-brand-mark">{{ icon("shield", 26) }}</span>
+      <span class="brand-text">
+        <span class="brand-name">PPASS</span>
+        <span class="brand-sub">{{ 'Admin workspace' if u.is_admin else 'Journalist workspace' }}</span>
+      </span>
+    </a>
 
     <nav class="side-nav" aria-label="Main">
-      {% if u.is_admin %}
-        {{ nav_item('admin.dashboard', 'Dashboard', ep) }}
-        {{ nav_item('admin.manage_journalists', 'Journalists', ep, ['admin.journalist_detail']) }}
-        {{ nav_item('admin.add_journalist', 'Add journalist', ep) }}
-        {{ nav_item('admin.audit_log', 'Audit log', ep) }}
-      {% else %}
-        {{ nav_item('journalist.dashboard', 'Dashboard', ep) }}
-        {{ nav_item('journalist.inbox', 'Inbox', ep, ['journalist.submission_detail']) }}
-        {{ nav_item('journalist.profile', 'My profile', ep) }}
-      {% endif %}
-      <p class="side-nav-label">Account</p>
-      {{ nav_item('auth.change_password', 'Change password', ep) }}
+      {% for heading, items in nav_sections %}
+        <p class="side-nav-label">{{ heading }}</p>
+        {% for endpoint, label, also, icon_name in items %}
+          {{ nav_item(endpoint, label, ep, also, icon_name) }}
+        {% endfor %}
+      {% endfor %}
     </nav>
-
-    {% if realtime %}
-    <p class="live-status" data-live-status hidden aria-live="polite"></p>
-    {% endif %}
-    <div class="sidebar-user">
-      <span class="avatar" aria-hidden="true">{{ (u.display_name or u.username)[:1] }}</span>
-      <span class="who" title="{{ u.username }}">{{ u.username }}</span>
-      <span class="badge badge-role">{{ u.role }}</span>
-      <form method="post" action="{{ url_for('auth.logout') }}">
-        {{ logout_form.hidden_tag() }}
-        <button type="submit" class="btn btn-secondary btn-small btn-block">Log out</button>
-      </form>
-    </div>
   </aside>
 
   <main id="main" class="app-main">
+    <header class="topbar">
+      <p class="topbar-title">{% if ns.section %}{{ ns.section }}{% else %}{{ self.title() }}{% endif %}</p>
+      <div class="topbar-actions">
+        {% if realtime %}
+        <p class="live-status" data-live-status hidden aria-live="polite"></p>
+        {% endif %}
+        <span class="topbar-user">
+          <span class="avatar" aria-hidden="true">{{ (u.display_name or u.username)[:1] }}</span>
+          <span class="who" title="{{ u.username }}">{{ u.username }}</span>
+          <span class="badge badge-role">{{ u.role }}</span>
+        </span>
+        {#- Switch account reuses the CSRF-protected, POST-only logout: the
+            session is ended on the server, then the login page is shown. -#}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="switch" value="1">
+          <button type="submit" class="btn btn-secondary btn-small">{{ icon("switch", 16) }}Switch account</button>
+        </form>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+          {{ logout_form.hidden_tag() }}
+          <button type="submit" class="btn btn-secondary btn-small">{{ icon("logout", 16) }}Log out</button>
+        </form>
+      </div>
+    </header>
     <div class="app-content">
 {% else %}
 <header class="site-header">

@@ -120,7 +120,9 @@ request
 
 Authorization comes **before** any cryptographic work. Anonymous users,
 admins, and pending or disabled journalists never trigger a decryption (the
-tests assert this). Admins still see **counts only**. Being an admin grants no
+tests assert this). Admins see counts and, on the security-analysis pages
+([`security_analysis.md`](security_analysis.md)), **ciphertext only**: stored
+values are parsed without any key and never decrypted. Being an admin grants no
 access to plaintext.
 
 If any check fails, nothing is shown. The journalist gets a 409 page, the event

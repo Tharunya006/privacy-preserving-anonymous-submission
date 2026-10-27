@@ -155,6 +155,17 @@ class BaseConfig:
     # How far in the future a protected timestamp may be (clock drift).
     PHASE5_MAX_CLOCK_SKEW_SECONDS = _env_int("PHASE5_MAX_CLOCK_SKEW_SECONDS", 300)
 
+    # --- Phase 7: server signing key (RSA-PSS) ------------------------------
+    # A passphrase-encrypted PKCS#8 PEM file OUTSIDE the repository and the
+    # database (create one with `flask generate-signing-key`).  Without it the
+    # app starts but refuses new submissions; an unusable configured key stops
+    # startup.  The passphrase is removed from app.config after loading.
+    PHASE7_SIGNING_KEY_FILE = os.environ.get("PHASE7_SIGNING_KEY_FILE")
+    PHASE7_SIGNING_KEY_PASSPHRASE = os.environ.get("PHASE7_SIGNING_KEY_PASSPHRASE")
+    # Directory of retired public keys (*.pem) that stay trusted for verification.
+    PHASE7_TRUSTED_PUBLIC_KEY_DIR = os.environ.get("PHASE7_TRUSTED_PUBLIC_KEY_DIR")
+    PHASE7_SIGNING_EPHEMERAL_TEST_KEY = False
+
     TESTING = False
     DEBUG = False
 
@@ -175,6 +186,11 @@ class TestingConfig(BaseConfig):
     # Fresh random keys for each test run -- no key material in the source.
     PHASE5_ENCRYPTION_KEY = secrets.token_urlsafe(32)
     PHASE5_HMAC_KEY = secrets.token_urlsafe(32)
+    # Never the real signing key in tests: an in-memory key per test process.
+    PHASE7_SIGNING_KEY_FILE = None
+    PHASE7_SIGNING_KEY_PASSPHRASE = None
+    PHASE7_TRUSTED_PUBLIC_KEY_DIR = None
+    PHASE7_SIGNING_EPHEMERAL_TEST_KEY = True
 
 
 class ProductionConfig(BaseConfig):

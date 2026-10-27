@@ -1,0 +1,263 @@
+{% extends "phase2/base.html" %}
+{% from "phase2/_analysis_ui.html" import num, txt, size, learn_more, state_badge %}
+{% from "phase2/_ui.html" import sub_badge %}
+{% block title %}Hashing analysis · {{ submission.reference }}{% endblock %}
+
+{% macro outcome(result) -%}
+{%- if not result -%}<span class="badge badge-problem">Could not be computed</span>
+{%- elif result.outcome == "no evidence of deviation" -%}<span class="badge badge-encrypted">No evidence of deviation</span>
+{%- elif result.outcome == "deviation flagged" -%}<span class="badge badge-problem">Deviation flagged</span>
+{%- else -%}<span class="badge badge-legacy">Too few flips to judge</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro not_analysed(state) -%}
+{%- if state == "legacy" -%}Not analysed: stored unencrypted (from before encryption was added); its content is not processed here.
+{%- elif state == "missing" -%}Not analysed: the stored file is missing.
+{%- elif state == "malformed" -%}Not analysed: not a valid encrypted package.
+{%- elif state == "empty" -%}Not analysed: the encrypted item has no ciphertext bytes.
+{%- else -%}Not analysed.{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('admin.analysis_report', submission_id=submission.id) }}">← Report {{ submission.reference }}</a>
+<header class="page-head">
+  <h1>SHA-256 hashing analysis <span class="ref">{{ submission.reference }}</span></h1>
+  <p class="lead">{{ sub_badge(submission.status, submission.status_label) }}
+    · received {{ submission.created_at.strftime('%Y-%m-%d %H:%M') }} · no key is used and nothing is decrypted on this page.</p>
+</header>
+
+{% for message in errors %}
+  <div class="alert alert-warn"><p>{{ message }} The rest of the page is unaffected.</p></div>
+{% endfor %}
+
+<div class="alert alert-info alert-stack">
+  <p><strong>What is analysed here, and what is not.</strong></p>
+  <p><span class="src src-report">Ciphertext analysis</span> The input is each item's <em>stored AES-GCM ciphertext</em>
+    (header, nonce, GCM tag and HMAC removed) — not the report's content.</p>
+  <p><span class="src src-synthetic">Synthetic messages</span> Generated text of the same length as each item — not the report's content.</p>
+  <p><strong>Plaintext analysis:</strong> none. The report's content is never decrypted or hashed on admin pages.</p>
+  <p class="small">These numbers describe how SHA-256 behaves on these inputs. SHA-256 behaves the same for every input, so every report is
+    expected to look ideal; <strong>they are not a security score for this report.</strong></p>
+</div>
+
+{# ------------------------------------------------------------- integrity (no keys) #}
+<section class="panel panel-flush" aria-labelledby="integrity-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="integrity-heading">How this report's integrity is protected</h2>
+      <p class="small muted">Checked on this page without any key: package structure and the protected timestamp. Authenticity is
+        <strong>not</strong> verified here.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Item</th><th>Stored as</th><th>Structure (no key)</th><th>Header time = record time (no key)</th><th>GCM tag</th><th>HMAC-SHA-256</th><th>Authenticity</th></tr></thead>
+      <tbody>
+      {% for item in items %}
+        <tr>
+          <th scope="row" data-label="Item">{{ item.label }}</th>
+          <td data-label="Stored as">{{ state_badge(item.state if item.state != "empty" else "encrypted") }}</td>
+          {% if item.structure %}
+            <td data-label="Structure (no key)">P5 v{{ item.structure.version }} · {{ item.structure.ciphertext_bytes }} B ciphertext</td>
+            <td data-label="Header time = record time (no key)">{% if item.structure.time_matches_record %}<span class="badge badge-encrypted">matches</span>{% else %}<span class="badge badge-problem">differs</span>{% endif %}</td>
+            <td data-label="GCM tag">present · {{ item.structure.tag_bytes }} B · <span class="muted">value hidden</span></td>
+            <td data-label="HMAC-SHA-256">present · {{ item.structure.mac_bytes }} B · <span class="muted">value hidden</span></td>
+            <td data-label="Authenticity" class="small">Not verified here — needs the server's HMAC key; verified each time a journalist opens the report</td>
+          {% else %}
+            <td colspan="5" data-label="Details" class="small muted">{{ not_analysed(item.state) }}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel-note small">
+    <p>The structure and time checks only show the stored data is <em>consistent</em>. Someone able to rewrite the database could make them
+      pass. An ordinary SHA-256 of the stored data would not prove authenticity either: anyone who changes the data can recompute it.
+      Only the HMAC-SHA-256 check with the server's secret key (and the GCM tag) proves the data is authentic, and that check runs when a
+      journalist opens the report or downloads evidence.</p>
+    <p><strong>Recorded integrity failures for this report: {{ history|length }}.</strong>
+      This is <em>history from the audit log</em>, not a current verification: it lists failures detected when the report was opened.
+      Zero means none was recorded — not that the data is intact now.</p>
+    {% if history %}
+      <ul class="small">
+      {% for e in history[:10] %}<li>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }} · <code>{{ e.action }}</code> · {{ e.detail or '' }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</section>
+
+{# ------------------------------------------------------------- ciphertext avalanche #}
+<section class="panel panel-flush" aria-labelledby="sac-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="sac-heading">Correlation and avalanche on the stored ciphertext</h2>
+      <p class="small muted"><span class="src src-report">Ciphertext analysis</span> For each item, up to {{ flips }} evenly spaced bits of
+        its stored ciphertext (first {{ input_cap // 1048576 }} MiB) are flipped one at a time and both versions are hashed with SHA-256.
+        Each test uses α = {{ alpha }}.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Item</th><th>Input · flips</th><th>Flip rate (ideal 0.5)</th><th>Per-bit χ²</th><th>Independence (HD variance, ideal 64)</th><th>φ (ideal 0)</th><th>Outcome</th></tr></thead>
+      <tbody>
+      {% for item in items %}
+        <tr>
+          <th scope="row" data-label="Item">{{ item.label }}</th>
+          {% set r = item.avalanche %}
+          {% if item.state == "encrypted" and r %}
+            <td data-label="Input · flips">{{ size(r.bytes_analysed) }}{% if r.capped %} of {{ size(r.bytes_total) }}{% endif %} · {{ r.trials }}</td>
+            <td class="num" data-label="Flip rate">{{ num(r.mean_flip_rate, 4) }} <span class="muted small">p {{ txt(r.p_values.balance, 3) }}</span></td>
+            <td class="num" data-label="Per-bit χ²">{{ num(r.chi_square, 1) }} <span class="muted small">p {{ txt(r.p_values.per_bit, 3) }}</span></td>
+            <td class="num" data-label="Independence">{{ num(r.hd_variance, 1) }} <span class="muted small">p {{ txt(r.p_values.independence, 3) }}</span></td>
+            <td class="num" data-label="φ">{{ num(r.phi, 4) }} <span class="muted small">p {{ txt(r.p_values.relation, 3) }}</span></td>
+            <td data-label="Outcome">{{ outcome(r) }}</td>
+          {% elif item.state == "encrypted" %}
+            <td colspan="6" data-label="Details">{{ outcome(none) }}</td>
+          {% else %}
+            <td colspan="6" data-label="Details" class="small muted">{{ not_analysed(item.state) }}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel-note">
+    {% call learn_more("Method, assumptions and limitations") %}
+      <p><strong>Model.</strong> For an ideal hash, the digest of every different input is an independent random 256-bit string. Then each
+        flipped input bit makes every output bit flip with probability ½, independently. Four consequences are tested:
+        <em>balance</em> (mean flip rate = ½, z-test), <em>per bit</em> (each of the 256 output bits flips half the time, χ² with 256 degrees of
+        freedom), <em>independence</em> (output bits don't flip together: the Hamming distance has variance 64, χ² variance test) and
+        <em>relation</em> (the two digests are uncorrelated, φ z-test).</p>
+      <p><strong>Reading the result.</strong> "No evidence of deviation" means no test rejected at α = {{ alpha }}. It is not proof of
+        security. With four tests per item, about 0.4 % of items will be flagged by chance, more when many reports are examined; a single
+        flag should be re-checked, not taken as a break. Fewer than 64 flips (inputs under 8 bytes) are too few to judge.</p>
+      <p><strong>Limitations.</strong> One base input per item and at most {{ flips }} flips; first-order statistics only — real attacks on hash
+        functions use structured differences that these tests cannot detect. The input is ciphertext, which already looks random, so the
+        results say nothing about the report and are expected to look the same for every report.</p>
+    {% endcall %}
+  </div>
+</section>
+
+{# ------------------------------------------------------------- synthetic modified messages #}
+<section class="panel panel-flush" aria-labelledby="mods-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="mods-heading">Digest bit difference for modified messages</h2>
+      <p class="small muted"><span class="src src-synthetic">Synthetic messages</span> Generated sentences of the same length as each item
+        (up to {{ sized_cap // 1024 }} KiB), each changed in one small way, then both hashed. Ideal: 128 of 256 bits differ (SD 8), φ ≈ 0.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Item (message size)</th><th>Change made</th><th>Pairs</th><th>Mean bits changed</th><th>SD</th><th>φ</th></tr></thead>
+      <tbody>
+      {% for item in items %}
+        {% set m = item.modifications %}
+        {% if item.state == "encrypted" and m %}
+          {% for row in m.rows %}
+          <tr{% if not loop.first %} class="row-cont"{% endif %}>
+            {% if loop.first %}<th scope="row" rowspan="{{ m.rows|length }}" data-label="Item">{{ item.label }} <span class="muted small">({{ size(m.message_bytes) }}{% if m.capped %}, capped{% endif %})</span></th>{% endif %}
+            <td data-label="Change made">{{ row.modification }}</td>
+            {% if row.pairs %}
+              <td class="num" data-label="Pairs">{{ row.pairs }}</td>
+              <td class="num" data-label="Mean bits changed"><strong>{{ num(row.mean, 1) }}</strong> <span class="muted small">(z {{ txt(row.z_mean, 2) }})</span></td>
+              <td class="num" data-label="SD">{{ num(row.sd, 1) }}</td>
+              <td class="num" data-label="φ">{{ num(row.phi, 4) }}</td>
+            {% else %}
+              <td colspan="4" data-label="Details" class="small muted">Not possible for a message this short.</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><th scope="row" data-label="Item">{{ item.label }}</th><td colspan="5" data-label="Details" class="small muted">{{ not_analysed(item.state) }}</td></tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ------------------------------------------------------------- real-target bounded experiments #}
+<section class="panel panel-flush" id="experiments" aria-labelledby="pre-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="pre-heading">Preimage and second-preimage experiments (truncated SHA-256)</h2>
+      <p class="small muted"><span class="src src-report">This report's stored bytes</span> Target = the first <em>t</em> bits of
+        SHA-256 of one stored encrypted representation of this report. The search runs in an isolated worker process, not in the web request.</p>
+    </div>
+  </div>
+  <div class="panel-note">
+    {% if experiment_items %}
+    <form method="post" action="{{ url_for('admin.analysis_hash_experiment', submission_id=submission.id) }}" class="experiment-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Item <select name="item">{% for key, label in experiment_items %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>Bytes <select name="representation"><option value="envelope">Envelope (complete stored package)</option><option value="payload">Payload (ciphertext only)</option></select></label>
+      <label>Experiment <select name="kind">{% for key, label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>Truncation t <select name="bits">{% for b in allowed_bits %}<option value="{{ b }}">{{ b }} bits</option>{% endfor %}</select></label>
+      <button type="submit" class="btn btn-small">Run experiment</button>
+    </form>
+    {% else %}
+      <p class="small muted">No encrypted item in this report — experiments run only on encrypted items.</p>
+    {% endif %}
+    {% call learn_more("Rules, budgets and limits") %}
+      <p><strong>Preimage:</strong> find any message whose SHA-256 starts with the same t bits as the target. Candidates are
+        <code>"ppass-preimage-candidate:" + 8-byte counter</code> (counter 1, 2, 3, …; one counter value = one attempt).</p>
+      <p><strong>Second preimage:</strong> find a message <em>different from the stored bytes</em> with the same first t bits.
+        Candidates are <code>stored bytes + "|ppass-second-preimage:" + 8-byte counter</code> — always longer than, hence different from,
+        the original.</p>
+      <p><strong>Budget:</strong> at most {{ job_limits.budget_factor }} × 2ᵗ attempts and {{ job_limits.time_limit|int }} s of searching; the worker
+        process is killed after {{ job_limits.wall_timeout|int }} s. One experiment runs at a time; at most {{ job_limits.max_pending }} can be queued or
+        running; each admin can start one every {{ job_limits.cooldown|int }} s. Results are kept in memory only.</p>
+      <p><strong>Verification:</strong> every reported match is recomputed from scratch by the worker and again, independently, by the
+        server. A result without a match is reported as "budget exhausted" or "time limit reached" — never as a success.</p>
+      <p><strong>What this shows:</strong> matching t bits costs about 2ᵗ attempts, so each extra bit doubles the work. It does
+        <em>not</em> break SHA-256 and is not a security score for this report: a full 256-bit match would need about 2²⁵⁶ attempts.
+        The global <a href="{{ url_for('admin.analysis_hashing') }}#pre-heading">synthetic toys</a> show the same scaling over many runs.</p>
+    {% endcall %}
+  </div>
+  {% if jobs %}
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Requested (UTC)</th><th>Item · bytes</th><th>Experiment</th><th>Status</th><th>Target (first t bits)</th><th>Attempts / budget</th><th>Time</th><th>Outcome</th><th>Verified</th></tr></thead>
+      <tbody>
+      {% for j in jobs %}
+        {% set r = j.result %}
+        <tr>
+          <td class="nowrap" data-label="Requested">{{ j.submitted_at.strftime('%H:%M:%S') }}</td>
+          <td data-label="Item · bytes">{{ j.item_label }} · {{ j.representation }}</td>
+          <td data-label="Experiment">{{ j.kind_label }}, t = {{ j.bits }}</td>
+          <td data-label="Status">{{ j.status }}{% if j.error %} <span class="muted small">({{ j.error }})</span>{% endif %}</td>
+          {% if r %}
+            <td data-label="Target"><code>{{ r.target_prefix }}</code></td>
+            <td class="num" data-label="Attempts / budget">{{ "{:,}".format(r.attempts) }} / {{ "{:,}".format(r.budget) }}
+              <span class="result-sub">expected ≈ {{ "{:,}".format(r.expected_attempts) }}</span></td>
+            <td class="num" data-label="Time">{{ txt(r.elapsed_seconds, 3) }} s</td>
+            <td data-label="Outcome">{% if r.found %}<span class="badge badge-encrypted">match found</span>{% else %}<span class="badge badge-legacy">{{ r.outcome }}</span>{% endif %}
+              {% if r.found %}<span class="result-sub">candidate: {{ r.candidate_bytes }} B, counter <code>{{ r.counter_hex }}</code>{% if j.kind == "second_preimage" %}, differs from the original: {{ "yes" if r.differs_from_target else "NO" }}{% endif %}</span>{% endif %}</td>
+            <td data-label="Verified">{% if r.found %}{% if r.worker_verified and j.server_verified %}<span class="badge badge-encrypted">worker ✓ server ✓</span>{% else %}<span class="badge badge-problem">not verified</span>{% endif %}{% else %}—{% endif %}</td>
+          {% else %}
+            <td colspan="5" data-label="Result" class="muted small">{% if j.status in ("queued", "running") %}{{ j.status }} — <a href="{{ url_for('admin.analysis_report_hashing', submission_id=submission.id) }}#experiments">refresh</a>{% else %}no result{% endif %}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+{# ------------------------------------------------------------- mechanisms #}
+<section class="panel" aria-labelledby="mech-heading">
+  <h2 id="mech-heading">Which mechanism does what for this report</h2>
+  <ul class="check-list">
+    <li><strong>HMAC-SHA-256</strong> (secret key): proves each stored item is authentic and unchanged; checked before any decryption.</li>
+    <li><strong>AES-GCM tag</strong> (secret key, GHASH-based, not SHA-256): checked again during decryption.</li>
+    <li><strong>SHA-256</strong> (no key): does not protect this report's content. The app uses it to store the source's token as a digest
+      (never shown here) and inside HMAC. A plain hash cannot prove authenticity.</li>
+    <li><strong>Digital signatures</strong> (public/private key pair): not used in this project.</li>
+  </ul>
+  <p class="small"><a href="{{ url_for('admin.analysis_hashing') }}#compare-heading">Full comparison table</a></p>
+</section>
+{% endblock %}

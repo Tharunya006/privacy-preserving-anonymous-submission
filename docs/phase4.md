@@ -104,7 +104,7 @@ removed by Phase 3 (see [`phase3.md`](phase3.md)). Downloads are:
 | Anonymous visitor | 302 → `/auth/login` (same answer whether the id exists or not) |
 | Journalist, `AUTHORIZED` | allowed |
 | Journalist, `PENDING` or `DISABLED` | cannot sign in; disabled mid-session → logged out on the next request |
-| Admin | 403 — admins manage accounts and see **counts only** on `/admin/dashboard` |
+| Admin | 403 — admins manage accounts and see **counts** on `/admin/dashboard` (and ciphertext only under `/admin/security-analysis`, see [`security_analysis.md`](security_analysis.md)) |
 
 Two independent gates guard every route: the `journalist` blueprint's
 `before_request` (`role_required(JOURNALIST)`) and `@journalist_required` on

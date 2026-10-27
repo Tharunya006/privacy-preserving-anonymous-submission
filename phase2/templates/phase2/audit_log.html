@@ -7,6 +7,8 @@
   <p class="lead">Most recent 100 security events. Passwords, report content and submission tokens are never recorded.</p>
 </header>
 
+<div class="toolbar"><span class="records-pill">{{ events|length }} record{{ '' if events|length == 1 else 's' }}</span></div>
+
 <section class="panel panel-flush" aria-label="Audit events">
   {% if events %}
   <div class="table-wrap">

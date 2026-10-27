@@ -1,0 +1,303 @@
+{% extends "phase2/base.html" %}
+{% from "phase2/_analysis_ui.html" import num, txt, size, histogram, learn_more, metric, metric_head, disclaimer, performance_table %}
+{% block title %}Controlled experiments{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('admin.analysis_overview') }}">← Security analysis</a>
+<header class="page-head">
+  <h1>Controlled experiments</h1>
+  <p class="lead">Tests that need the original data or the key. They run on <strong>sample data</strong> with
+    <strong>temporary keys</strong> that are thrown away afterwards. No real report or real key is used.
+    The numbers are measured again on every page load.</p>
+</header>
+
+{% for message in errors %}
+  <div class="alert alert-warn"><p>{{ message }} The rest of the page is unaffected.</p></div>
+{% endfor %}
+
+{{ disclaimer() }}
+
+<div class="alert alert-info alert-stack">
+  <p><strong>Plaintext sensitivity vs nonce randomization — two different things.</strong></p>
+  <p><em>Plaintext sensitivity</em> (avalanche, NPCR, UACI) is measured as a <strong>controlled diagnostic with a fixed nonce</strong>,
+    a setting the app never uses, so that only the input change can affect the output. AES-GCM is AES in counter mode: one changed
+    input bit changes exactly one ciphertext bit. That is its design, not a weakness; integrity comes from the GCM tag and the HMAC,
+    and confidentiality from never reusing a nonce.</p>
+  <p><em>Nonce randomization</em> (shown separately below each section) is what the app really does: every encryption uses a fresh
+    random nonce, so the output changes completely — <strong>even when the input does not change at all</strong>, as the control row shows.
+    Those values therefore say nothing about plaintext sensitivity. None of these numbers is a security score or proof of security.</p>
+</div>
+
+{# ------------------------------------------------------------- text #}
+{% if text %}
+<section class="panel" aria-labelledby="text-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="text-heading">Text metrics (5)</h2>
+      <p class="small muted">Sample: {{ text.sample_bytes }} bytes of English text (one sentence repeated). {{ text.trials }} trials, average shown.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack metric-table">
+      {{ metric_head() }}
+      <tbody>
+      {% call metric("Entropy",
+          "Encrypted text looks random. Closer to 8 = more random.",
+          "Shannon entropy H = −Σ p·log₂p of the original and the encrypted bytes (tag and HMAC excluded), in bits per byte.",
+          "Maximum possible for this length: " ~ txt(text.entropy.max_for_length, 3) ~ ". Normal text uses few letters, so it scores about 4–5.") %}
+        <span class="before-after">
+          <span>Before <span class="result-value">{{ num(text.entropy.plaintext, 3) }}</span></span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span>After <span class="result-value">{{ num(text.entropy.ciphertext, 3) }}</span></span>
+        </span> <span class="unit">bits/byte</span>
+      {% endcall %}
+      {% call metric("Avalanche effect",
+          "Controlled diagnostic (fixed nonce): how much of the output a 1-bit plaintext change affects. AES-GCM changes exactly 1 ciphertext bit by design; the GCM tag changes about half. Not a security score.",
+          "Same temporary key and the same fixed nonce for both encryptions; flip one plaintext bit (" ~ text.trials ~ " positions) and count changed bits in the ciphertext and, separately, in the 16-byte GCM tag. Average of the trials.",
+          "The fixed nonce isolates the plaintext change; the app never reuses a nonce. Nonce randomization is shown separately below.") %}
+        Ciphertext <span class="result-value">{{ num(text.avalanche.fixed_nonce_ciphertext_pct, 4) }}</span> <span class="unit">% (1 bit of {{ "{:,}".format(text.sample_bytes * 8) }})</span>
+        <span class="result-sub">GCM tag: {{ num(text.avalanche.fixed_nonce_tag_pct, 2) }} % of its 128 bits</span>
+      {% endcall %}
+      {% call metric("Frequency analysis",
+          "Letter patterns disappear: the encrypted histogram is flat.",
+          "Count each byte value (0–255) and run a χ² (chi-square) test against an even spread (255 degrees of freedom).",
+          "χ² ≈ 255 means evenly spread; above 293.25 would be uneven (p = 0.05). Byte values present: " ~ text.frequency.plaintext_distinct ~ " before, " ~ text.frequency.ciphertext_distinct ~ " after. Most common letters in the original: " ~ (text.frequency.top_plaintext_letters|map("join", " ")|join(", ")) ~ ".") %}
+        <span class="before-after">
+          <span>χ² before <span class="result-value">{{ num(text.frequency.plaintext_chi_square, 0) }}</span></span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span>after <span class="result-value">{{ num(text.frequency.ciphertext_chi_square, 1) }}</span></span>
+        </span>
+        <div class="chart-pair">
+          {{ histogram(text.frequency.plaintext_bars, "Before", "plain") }}
+          {{ histogram(text.frequency.ciphertext_bars, "After") }}
+        </div>
+      {% endcall %}
+      {% call metric("Correlation",
+          "Near 0 = the encrypted text has no link to the original.",
+          "Pearson correlation (−1 to 1) between the original and encrypted bytes, and between each byte and the next.",
+          "Byte-to-byte: before " ~ txt(text.correlation.plaintext_serial, 4) ~ ", after " ~ txt(text.correlation.ciphertext_serial, 4) ~ ".") %}
+        <span class="result-value">{{ num(text.correlation.plaintext_vs_ciphertext, 4) }}</span> <span class="unit">original vs encrypted</span>
+      {% endcall %}
+      {% call metric("Key sensitivity",
+          "A key that is wrong by 1 bit gives a totally different result and cannot decrypt.",
+          "Flip one bit of the key, encrypt the same text again (same nonce), and count the changed output bits. Then try to decrypt with the changed key.",
+          "HMAC output changed by " ~ txt(text.key_sensitivity.mac_pct_after_1bit_key_flip, 2) ~ " % when the HMAC key was changed by one bit.") %}
+        <span class="result-value">{{ num(text.key_sensitivity.ciphertext_pct_after_1bit_key_flip, 2) }}</span> <span class="unit">% bits changed</span>
+        <span class="result-sub">Wrong keys rejected: {{ text.key_sensitivity.decryption_rejected_wrong_enc_key }}/{{ text.trials }} (encryption key),
+          {{ text.key_sensitivity.decryption_rejected_wrong_mac_key }}/{{ text.trials }} (HMAC key)</span>
+      {% endcall %}
+      </tbody>
+    </table>
+  </div>
+  <h3 class="section-title">Nonce randomization (separate from avalanche)</h3>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Two encryptions with fresh random nonces (as in the app)</th><th>Bits changed (nonce, ciphertext, tag, HMAC)</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Inputs">Plaintexts differ by 1 bit</td><td class="num" data-label="Bits changed">{{ num(text.avalanche.production_package_pct, 2) }} %</td></tr>
+        <tr><td data-label="Inputs"><strong>Control:</strong> the same plaintext twice</td><td class="num" data-label="Bits changed">{{ num(text.avalanche.fresh_nonce_same_plaintext_pct, 2) }} %</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">Both rows are about 50 % because each encryption uses a new random nonce — the plaintext change contributes nothing
+    visible. This is <em>randomized encryption</em> (equal plaintexts give unrelated ciphertexts), not avalanche. The fixed 11-byte header is excluded.</p>
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- image #}
+{% if image %}
+{% set short_names = {
+  "original vs decrypted (encrypt/decrypt round trip)": "Original vs decrypted",
+  "uploaded PNG vs metadata-scrubbed PNG (lossless)": "PNG before vs after scrubbing",
+  "uploaded JPEG vs metadata-scrubbed JPEG (re-encoded, quality 95)": "JPEG before vs after scrubbing",
+} %}
+<section class="panel" aria-labelledby="image-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="image-heading">Image metrics (8)</h2>
+      <p class="small muted">Sample: a generated {{ image.width }}×{{ image.height }} {{ "colour (RGB)" if image.mode == "RGB" else "grayscale" }} image
+        ({{ image.pixels }} pixels, {{ image.bytes }} bytes{% if image.mode == "RGB" %}: 3 per pixel{% endif %}). Its pixel bytes are encrypted, so the
+        ciphertext is shown as a {{ "colour" if image.mode == "RGB" else "grayscale" }} picture of the same size.</p>
+    </div>
+  </div>
+  <div class="image-pair">
+    <figure>
+      <img class="cipher-image cipher-image-sm" src="{{ images.plain }}" width="{{ image.width }}" height="{{ image.height }}" alt="Sample image before encryption">
+      <figcaption>Original{{ " (colour)" if image.mode == "RGB" else "" }}</figcaption>
+    </figure>
+    <span class="arrow" aria-hidden="true">→</span>
+    <figure>
+      <img class="cipher-image cipher-image-sm" src="{{ images.cipher }}" width="{{ image.width }}" height="{{ image.height }}" alt="Sample image after encryption">
+      <figcaption>Encrypted</figcaption>
+    </figure>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack metric-table">
+      {{ metric_head() }}
+      <tbody>
+      {% call metric("Histogram",
+          "The original has a shape; the encrypted image is flat (no value stands out).",
+          "Count each value 0–255 (shown in 64 groups), before and after encryption" ~ (" — every R, G and B value is counted" if image.mode == "RGB" else "") ~ ".",
+          "χ² is measured against an even spread of the 256 values: ≈ 255 is ideal, above 293.25 would be uneven at p = 0.05.") %}
+        <span class="before-after">
+          <span>χ² before <span class="result-value">{{ num(image.histogram.plain_chi_square, 0) }}</span></span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span>after <span class="result-value">{{ num(image.histogram.cipher_chi_square, 1) }}</span></span>
+        </span>
+        <div class="chart-pair">
+          {{ histogram(image.histogram.plain_bars, "Before", "plain") }}
+          {{ histogram(image.histogram.cipher_bars, "After") }}
+        </div>
+      {% endcall %}
+      {% call metric("Entropy",
+          "The encrypted image looks random. Closer to 8 = more random.",
+          "Shannon entropy H = −Σ p·log₂p of the " ~ ("R, G and B values (all channels together)" if image.mode == "RGB" else "pixel values") ~ ", in bits per value.") %}
+        <span class="before-after">
+          <span>Before <span class="result-value">{{ num(image.entropy.plain, 3) }}</span></span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span>After <span class="result-value">{{ num(image.entropy.cipher, 3) }}</span></span>
+        </span> <span class="unit">bits/value</span>
+      {% endcall %}
+      {% call metric("Pixel correlation",
+          "Neighbouring pixels are similar in the original (≈ 1) and unrelated after encryption (≈ 0).",
+          "Pearson correlation of every pair of neighbouring pixels: horizontal (H), vertical (V) and diagonal (D)" ~ (", for each colour channel separately; the first two rows are the average of R, G and B" if image.mode == "RGB" else "") ~ ".") %}
+        <table class="mini-table">
+          <thead><tr><th></th><th>H</th><th>V</th><th>D</th></tr></thead>
+          <tbody>
+            <tr><th>Original{{ " (avg)" if image.mode == "RGB" else "" }}</th><td>{{ num(image.correlation.plain.horizontal, 4) }}</td><td>{{ num(image.correlation.plain.vertical, 4) }}</td><td>{{ num(image.correlation.plain.diagonal, 4) }}</td></tr>
+            <tr><th>Encrypted{{ " (avg)" if image.mode == "RGB" else "" }}</th><td><strong>{{ num(image.correlation.cipher.horizontal, 4) }}</strong></td><td><strong>{{ num(image.correlation.cipher.vertical, 4) }}</strong></td><td><strong>{{ num(image.correlation.cipher.diagonal, 4) }}</strong></td></tr>
+          </tbody>
+        </table>
+        {% if image.mode == "RGB" %}
+        {% call learn_more("Per channel") %}
+          <table class="mini-table">
+            <thead><tr><th></th><th>H</th><th>V</th><th>D</th></tr></thead>
+            <tbody>
+            {% for name in ["R", "G", "B"] %}
+              {% set pc, cc = image.correlation.plain_channels[name], image.correlation.cipher_channels[name] %}
+              <tr><th>{{ name }} original</th><td>{{ num(pc.horizontal, 4) }}</td><td>{{ num(pc.vertical, 4) }}</td><td>{{ num(pc.diagonal, 4) }}</td></tr>
+              <tr><th>{{ name }} encrypted</th><td>{{ num(cc.horizontal, 4) }}</td><td>{{ num(cc.vertical, 4) }}</td><td>{{ num(cc.diagonal, 4) }}</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        {% endcall %}
+        {% endif %}
+      {% endcall %}
+      {% call metric("NPCR",
+          "Controlled diagnostic (fixed nonce): share of encrypted values that change when one pixel value changes. With AES-GCM exactly one changes, by design. Not a cryptographic security score.",
+          "Change one value of the centre pixel by one level; encrypt both images with the same temporary key and fixed nonce; count the % of byte values that differ (Number of Pixels Change Rate, over all channel values).",
+          "NPCR/UACI come from image-encryption research, where ≈ 99.61 % / 33.46 % are expected for diffusing ciphers. AES-GCM does not diffuse; it relies on unique nonces. Nonce randomization is shown separately below.") %}
+        <span class="result-value">{{ num(image.npcr_uaci.fixed_nonce[0], 4) }}</span> <span class="unit">% (1 value of {{ "{:,}".format(image.bytes) }})</span>
+      {% endcall %}
+      {% call metric("UACI",
+          "Controlled diagnostic (fixed nonce): average size of the change in the encrypted values. Not a cryptographic security score.",
+          "Same two encrypted images as NPCR: mean absolute difference of all values, as a % of 255 (Unified Average Changing Intensity).",
+          "Nonce randomization is shown separately below.") %}
+        <span class="result-value">{{ num(image.npcr_uaci.fixed_nonce[1], 6) }}</span> <span class="unit">%</span>
+      {% endcall %}
+      {% call metric("Key sensitivity",
+          "A key that is wrong by 1 bit gives a completely different image and cannot decrypt.",
+          "Encrypt the same image with two keys that differ by one bit (same nonce) and compare. Then try to decrypt with the changed key. Average over " ~ image.key_sensitivity.trials ~ " different key bits.",
+          "UACI between the two encrypted images: " ~ txt(image.key_sensitivity.uaci, 2) ~ " %. Bits changed: " ~ txt(image.key_sensitivity.bit_difference_pct, 2) ~ " %.") %}
+        NPCR <span class="result-value">{{ num(image.key_sensitivity.npcr, 2) }}</span> <span class="unit">%</span>
+        <span class="result-sub">Wrong keys rejected: <strong>{{ image.key_sensitivity.rejected }}/{{ image.key_sensitivity.trials }}</strong></span>
+      {% endcall %}
+      {% call metric("MSE / PSNR",
+          "Checks image quality is kept. MSE 0 and PSNR ∞ = identical; PSNR above 40 dB = almost identical.",
+          "MSE = average squared difference of pixel values; PSNR = 10·log₁₀(255² / MSE) in decibels (dB). Only two versions of the same image are compared.",
+          "These measure quality, not secrecy. Comparing an image with its encrypted version would not be meaningful. The JPEG loss comes from metadata scrubbing (it re-saves the JPEG at quality 95), not from encryption.") %}
+        <table class="mini-table">
+          <thead><tr><th></th><th>MSE</th><th>PSNR (dB)</th></tr></thead>
+          <tbody>
+          {% for label, q in image.quality.items() %}
+            <tr><th>{{ short_names.get(label, label) }}</th><td>{{ num(q.mse, 3) }}</td><td>{{ num(q.psnr, 2) }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% endcall %}
+      {% call metric("SSIM",
+          "How similar two images look to a person. 1 = identical.",
+          "Structural Similarity Index (Wang et al., 2004) on 8×8 windows, step 4, using 8-bit brightness. Same image pairs as MSE / PSNR.") %}
+        <table class="mini-table">
+          <thead><tr><th></th><th>SSIM</th></tr></thead>
+          <tbody>
+          {% for label, q in image.quality.items() %}
+            <tr><th>{{ short_names.get(label, label) }}</th><td>{{ num(q.ssim, 4) }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% endcall %}
+      </tbody>
+    </table>
+  </div>
+  <h3 class="section-title">Nonce randomization (separate from NPCR / UACI)</h3>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Two encryptions with fresh random nonces (as in the app)</th><th>NPCR</th><th>UACI</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Inputs">Images differ by one pixel value</td><td class="num" data-label="NPCR">{{ num(image.npcr_uaci.production_fresh_nonce[0], 2) }} %</td><td class="num" data-label="UACI">{{ num(image.npcr_uaci.production_fresh_nonce[1], 2) }} %</td></tr>
+        <tr><td data-label="Inputs"><strong>Control:</strong> the same image twice</td><td class="num" data-label="NPCR">{{ num(image.npcr_uaci.same_image_fresh_nonce[0], 2) }} %</td><td class="num" data-label="UACI">{{ num(image.npcr_uaci.same_image_fresh_nonce[1], 2) }} %</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">Both rows look like the "ideal" 99.61 % / 33.46 % because of the fresh nonce, even for an unchanged image. These values
+    are not evidence of diffusion and not a security score.</p>
+  {% call learn_more("Image input format and transformations") %}
+    <p>The input is a generated {{ image.width }}×{{ image.height }} {{ "8-bit RGB" if image.mode == "RGB" else "8-bit grayscale" }} image
+      (gradient background with shapes). The bytes encrypted are the raw pixel values in row-major order{% if image.mode == "RGB" %}, R, G, B
+      interleaved (3 bytes per pixel){% endif %} — no file format, no compression. The encrypted bytes have the same length and are drawn back
+      as a picture of the same size. MSE/PSNR/SSIM convert both images to 8-bit brightness (Pillow "L"); the scrubbing comparisons encode the
+      image as PNG (lossless) and as JPEG at quality 100 before the app re-saves it.</p>
+  {% endcall %}
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- digital signature #}
+{% if signature %}
+<section class="panel" aria-labelledby="sig-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="sig-heading">Digital signature experiment (RSA-PSS)</h2>
+      <p class="small muted"><span class="src src-synthetic">Synthetic experiment</span> A synthetic {{ signature.message_bytes }}-byte message is signed
+        with a dedicated {{ signature.key_bits }}-bit key pair created for this page load and then discarded. <strong>The app does not sign submissions</strong>;
+        this only demonstrates what a signature is.</p>
+    </div>
+    {% if signature.all_checks_passed %}<span class="badge badge-encrypted">All checks behaved as expected</span>{% else %}<span class="badge badge-problem">A check failed</span>{% endif %}
+  </div>
+  <div class="table-wrap">
+    <table class="table table-stack table-compact">
+      <thead><tr><th>Measurement</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Measurement">Scheme</td><td data-label="Result">{{ signature.scheme }}, {{ signature.hash }}, {{ signature.mgf }}, {{ signature.salt_bytes }}-byte salt, e = {{ signature.public_exponent }}</td></tr>
+        <tr><td data-label="Measurement">Signature size</td><td data-label="Result">{{ signature.signature_bytes }} bytes</td></tr>
+        <tr><td data-label="Measurement">Key generation (one key pair)</td><td class="num" data-label="Result">{{ num(signature.keygen_ms, 1) }} ms</td></tr>
+        <tr><td data-label="Measurement">Sign (median of {{ signature.runs }})</td><td class="num" data-label="Result">{{ num(signature.sign_ms, 3) }} ms</td></tr>
+        <tr><td data-label="Measurement">Verify (median of {{ signature.runs }})</td><td class="num" data-label="Result">{{ num(signature.verify_ms, 3) }} ms</td></tr>
+        {% for name, ok in signature.checks.items() %}
+        <tr><td data-label="Measurement">{{ name[:1]|upper ~ name[1:] }}</td><td data-label="Result">{% if ok %}<span class="badge badge-encrypted">yes</span>{% else %}<span class="badge badge-problem">NO</span>{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% call learn_more("Signature vs hash vs HMAC vs encryption") %}
+    <p><strong>Signature:</strong> made with a <em>private</em> key, checked by anyone with the <em>public</em> key — shows who signed and that nothing
+      changed, and the signer cannot later deny it. <strong>HMAC</strong> (used by this app): one shared secret key both makes and checks the tag, so
+      only key holders can check it and it cannot prove which holder made it. <strong>SHA-256:</strong> no key at all — anyone can recompute it, so it
+      shows only that bytes are unchanged relative to a trusted digest. <strong>Encryption</strong> (AES-GCM) hides content; it is not a signature.</p>
+    <p>Timings depend on this machine; verification is much faster than signing because the public exponent is small. The checks show the
+      expected behaviour on one message and one key pair; they are not a proof of security.</p>
+  {% endcall %}
+</section>
+{% endif %}
+
+{# ------------------------------------------------------------- performance #}
+<section class="panel panel-flush" aria-labelledby="perf-heading">
+  <div class="panel-head">
+    <div>
+      <h2 id="perf-heading">Performance</h2>
+      <p class="small muted">How long encryption and decryption take for different sizes.</p>
+    </div>
+  </div>
+  {% if performance %}{{ performance_table(performance, show_package=true) }}{% endif %}
+</section>
+{% endblock %}

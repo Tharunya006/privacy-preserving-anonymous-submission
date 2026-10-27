@@ -11,6 +11,7 @@
   </p>
 </header>
 
+<div class="toolbar">
 <nav class="tabs" aria-label="Filter by status">
   <a class="tab {% if not status_filter %}is-active{% endif %}"
      href="{{ url_for('journalist.inbox') }}"{% if not status_filter %} aria-current="page"{% endif %}>
@@ -23,6 +24,8 @@
     </a>
   {% endfor %}
 </nav>
+<span class="records-pill">{{ pagination.total }} record{{ '' if pagination.total == 1 else 's' }}</span>
+</div>
 
 <section class="panel panel-flush" aria-label="Submissions">
   {% if submissions %}
@@ -49,16 +52,19 @@
   </div>
   {% if pagination.pages > 1 %}
   <nav class="pager" aria-label="Inbox pages">
-    <span>
-      {% if pagination.has_prev %}
-        <a class="btn btn-secondary btn-small" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.prev_num) }}">&larr; Newer</a>
-      {% endif %}
-    </span>
     <span class="muted small">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-    <span>
+    <span class="pager-pages">
+      {% if pagination.has_prev %}
+        <a class="pager-btn" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.prev_num) }}" rel="prev"><span aria-hidden="true">&lsaquo;</span><span class="visually-hidden">Newer</span></a>
+      {% else %}<span class="pager-btn is-disabled" aria-hidden="true">&lsaquo;</span>{% endif %}
+      {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+        {% if p is none %}<span class="pager-gap" aria-hidden="true">&hellip;</span>
+        {% elif p == pagination.page %}<span class="pager-btn is-current" aria-current="page">{{ p }}</span>
+        {% else %}<a class="pager-btn" href="{{ url_for('journalist.inbox', status=status_filter, page=p) }}"><span class="visually-hidden">Page </span>{{ p }}</a>{% endif %}
+      {% endfor %}
       {% if pagination.has_next %}
-        <a class="btn btn-secondary btn-small" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.next_num) }}">Older &rarr;</a>
-      {% endif %}
+        <a class="pager-btn" href="{{ url_for('journalist.inbox', status=status_filter, page=pagination.next_num) }}" rel="next"><span aria-hidden="true">&rsaquo;</span><span class="visually-hidden">Older</span></a>
+      {% else %}<span class="pager-btn is-disabled" aria-hidden="true">&rsaquo;</span>{% endif %}
     </span>
   </nav>
   {% endif %}

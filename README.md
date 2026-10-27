@@ -11,8 +11,9 @@ One Flask application with one database:
   and reports and evidence are stored encrypted (AES-256-GCM + HMAC-SHA-256).
 * **Authorized journalists** sign in to read reports, download evidence and
   update each report's status.
-* **Administrators** create, authorize and disable journalist accounts and
-  review the audit log.
+* **Administrators** create, authorize and disable journalist accounts,
+  review the audit log, and view a ciphertext-only security analysis of the
+  stored encryption (never report content).
 
 **All six phases are integrated** into one application with one database:
 
@@ -45,6 +46,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"   # paste into PHAS
 
 flask --app app init-db
 flask --app app create-admin --username admin
+flask --app app generate-signing-key --out-dir ~/ppass-signing-keys   # then add the printed lines to .env
 python app.py                          # http://127.0.0.1:5001
 ```
 
@@ -63,7 +65,12 @@ pip install -r requirements.txt
 flask --app app init-db                # no-op for existing tables
 flask --app app protect-legacy-data    # encrypt pre-Phase-5 reports/evidence (use --dry-run first)
 flask --app app scrub-evidence         # clean older evidence (use --dry-run first)
+flask --app app generate-signing-key --out-dir ~/ppass-signing-keys   # Phase 7, once
+flask --app app verify-signatures      # check every report's signature
 ```
+
+Phase 7 signs every newly accepted report; older reports stay "Unsigned
+(legacy)". Without a signing key the app starts but refuses new reports.
 
 ### Phase 6 analysis (optional)
 
@@ -97,5 +104,10 @@ pytest
   limitations
 * [`docs/phase4.md`](docs/phase4.md) — journalist workflow, status rules,
   evidence access and Phase 4 security
+* [`docs/signatures.md`](docs/signatures.md) — Phase 7 server signatures:
+  what is signed, what a valid signature proves, key custody and rotation
 * [`docs/phase6.md`](docs/phase6.md) — WebSocket notifications, traffic analysis
   (Wireshark/PyShark), timing results, image colour-mode behaviour, limitations
+* [`docs/security_analysis.md`](docs/security_analysis.md) — admin security
+  analysis: ciphertext-only metrics for real reports, controlled experiments
+  (entropy, avalanche, NPCR/UACI, PSNR/SSIM, …), performance

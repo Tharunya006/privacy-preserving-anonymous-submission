@@ -34,7 +34,8 @@
   <div class="stat"><span class="stat-label">Closed</span><span class="stat-num">{{ submission_counts['CLOSED'] }}</span></div>
 </div>
 <div class="alert alert-info">
-  <p>Administrators see counts only. Report content is visible to authorized journalists.</p>
+  <p>Administrators see counts and, under <a href="{{ url_for('admin.analysis_overview') }}">Security analysis</a>,
+    encrypted (ciphertext) data only, never report content. Report content is visible to authorized journalists.</p>
 </div>
 
 <section class="panel panel-flush" aria-labelledby="pending-heading">

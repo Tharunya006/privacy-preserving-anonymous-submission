@@ -27,11 +27,15 @@ from .scrubber import (
     scrub_evidence,
 )
 from .services import (
+    SIGNATURE_STATUSES,
     evidence_path,
+    is_signed,
     read_evidence_file,
     seal_submission_fields,
+    verify_submission_signature,
     write_evidence_file,
 )
+from .signing import SigningConfigurationError, generate_key_files
 
 
 def _load_evidence(evidence: Evidence) -> tuple[bytes, bool] | str:
@@ -90,6 +94,12 @@ def scrub_evidence_command(dry_run: bool) -> None:
     cleaned = unchanged = skipped = 0
     for evidence in db.session.execute(db.select(Evidence).order_by(Evidence.id)).scalars():
         label = f"evidence #{evidence.id} (submission #{evidence.submission_id})"
+        if is_signed(evidence.submission_id):
+            # Phase 7: signed reports were scrubbed at intake; rewriting their
+            # evidence would (correctly) invalidate the signature.
+            click.echo(f"{label}: signed report - skipped")
+            skipped += 1
+            continue
         loaded = _load_evidence(evidence)
         if isinstance(loaded, str):
             click.echo(f"{label}: {loaded} - skipped")
@@ -185,3 +195,57 @@ def protect_legacy_data_command(dry_run: bool) -> None:
 
     verb = "would be encrypted" if dry_run else "encrypted"
     click.echo(f"{reports} report(s) and {files} evidence file(s) {verb}; {warnings} warning(s).")
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: server signatures
+# ---------------------------------------------------------------------------
+@click.command("generate-signing-key")
+@click.option("--out-dir", required=True, type=click.Path(file_okay=False),
+              help="Directory OUTSIDE the project for the new key files.")
+@with_appcontext
+def generate_signing_key_command(out_dir: str) -> None:
+    """Create a new RSA-3072 signing key pair (encrypted private PEM + public PEM).
+
+    Nothing is changed in .env or the running server: the command prints the
+    settings to add.  The passphrase is asked for interactively and never printed.
+    """
+    from flask import current_app
+
+    target = Path(out_dir).expanduser().resolve()
+    project = Path(current_app.root_path).resolve().parent
+    if target == project or project in target.parents:
+        raise click.ClickException("Choose a directory outside the project so the key is never committed.")
+    passphrase = click.prompt("Passphrase for the new key", hide_input=True, confirmation_prompt=True)
+    try:
+        private_path, public_path, key_id = generate_key_files(target, passphrase)
+    except (SigningConfigurationError, FileExistsError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Key ID:      {key_id}")
+    click.echo(f"Private key: {private_path}  (encrypted, mode 600 - keep it secret)")
+    click.echo(f"Public key:  {public_path}")
+    click.echo("Add to .env, then restart the server:")
+    click.echo(f"  PHASE7_SIGNING_KEY_FILE={private_path}")
+    click.echo("  PHASE7_SIGNING_KEY_PASSPHRASE=<the passphrase you just entered>")
+
+
+@click.command("verify-signatures")
+@with_appcontext
+def verify_signatures_command() -> None:
+    """Verify every report's server signature (public keys only; nothing is decrypted).
+
+    Exits with status 1 if any report is not Valid or Unsigned (legacy).
+    """
+    counts: dict[str, int] = {}
+    for submission in db.session.execute(db.select(Submission).order_by(Submission.id)).scalars():
+        try:
+            result = verify_submission_signature(submission)
+        except Exception:  # never let one report hide the others
+            result = {"status": "error", "key_id": None}
+        status = result["status"]
+        counts[status] = counts.get(status, 0) + 1
+        key = f"  key {result['key_id']}" if result.get("key_id") else ""
+        click.echo(f"{submission.reference}: {SIGNATURE_STATUSES[status]}{key}")
+    click.echo(", ".join(f"{n} {SIGNATURE_STATUSES[s].lower()}" for s, n in sorted(counts.items())) or "No reports.")
+    if any(status not in ("valid", "legacy") for status in counts):
+        raise SystemExit(1)

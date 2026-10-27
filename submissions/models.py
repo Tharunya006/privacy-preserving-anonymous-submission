@@ -116,3 +116,39 @@ class Evidence(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Evidence {self.id} of submission {self.submission_id}>"
+
+
+class SubmissionSignature(db.Model):
+    """The server's RSA-PSS signature over a submission's signed manifest.
+
+    Separate table: signing never rewrites a submission row.  One signature per
+    submission, written in the same transaction as the submission itself.
+    Stores only what verification needs -- never the manifest, never any key.
+    """
+
+    __tablename__ = "submission_signatures"
+
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(
+        db.Integer, db.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    manifest_version = db.Column(db.Integer, nullable=False)
+    algorithm = db.Column(db.String(40), nullable=False)
+    signature_format = db.Column(db.Integer, nullable=False)
+    key_id = db.Column(db.String(64), nullable=False)
+    signed_at = db.Column(db.DateTime, nullable=False)
+    signature = db.Column(db.LargeBinary, nullable=False)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<SubmissionSignature submission={self.submission_id} key={self.key_id}>"
+
+
+class SigningSettings(db.Model):
+    """One row: the first submission id that had to be signed.  Older reports
+    are legacy (unsigned by design); a newer report without a signature is
+    reported as "missing signature", never as legacy."""
+
+    __tablename__ = "signing_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    required_from_submission_id = db.Column(db.Integer, nullable=False)

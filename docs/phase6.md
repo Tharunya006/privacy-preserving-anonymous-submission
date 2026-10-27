@@ -84,7 +84,7 @@ timeout, account re-read from the database).
 |---|---|
 | Authorized journalist | connected |
 | Anonymous visitor / anonymous source | refused (sources never even load the client) |
-| Admin | refused (admins see counts only, as on HTTP) |
+| Admin | refused (admins never see report content, as on HTTP) |
 | Pending or disabled journalist, or temporary password not yet changed | refused |
 | Expired / forged session cookie | refused |
 | Request from a foreign `Origin` (cross-site WebSocket hijacking) | refused by Socket.IO's same-origin check (HTTP 400) |
